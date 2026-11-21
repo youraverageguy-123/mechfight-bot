@@ -8,12 +8,12 @@ import { angDiff, clamp, makeRng, norm2, now, TAU, wrapAngle } from "./util.ts"
 
 // ---- tunables (A/B test these) ----
 export const P = {
-  retreatFrac: 0.38, // retreat below this HP fraction
-  recoverFrac: 0.85, // stop retreating above this
+  retreatFrac: 0.5, // retreat below this HP fraction
+  recoverFrac: 0.95, // stop retreating above this
   weaponRank: { laser: 3, lightning: 2, mortar: 1, gun: 0 } as Record<string, number>,
   lightningReserve: 12, // energy kept back
   farmUntil: 230, // farm crates / drones before this match time
-  farmMinHp: 0.55,
+  farmMinHp: 0.75,
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
