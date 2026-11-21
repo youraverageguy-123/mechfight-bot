@@ -16,3 +16,14 @@ Findings: 12k fuzzed observations -> no crashes. Roof camping (sim): survives lo
 Practice points are essentially our kills (house bots never fight each other).
 Recorded laser bot: gun lead hit-rate vs jinking target 100% @50m, 73% @100m, 47% @150m, 21% @200m.
 Sim (paired, 100 seeds): hunting drones + wider cube pickup = +0.97 +-0.41 pts.
+| 8 | 05d2408 (main) | cube economy: hunt drones, wide cube pickup | 4.58 |
+| 9 | e0c08b1 (exp-f-mildfarm) | milder drone hunting | 4.67 |
+| 10 | 297cfbe (exp-g-closein) | cube economy + close in under 70 m | 4.67 |
+
+Finding (track rules): the 15 house bots are 4 easy / 4 medium / 4 hard / 3 expert and hunt us
+weakest first; the rest stay idle on the map. Our bot shot at and chased every mech in sight, so it
+woke up stronger idle bots. Sim rebuilt with the full tiered roster (TIERS=1).
+
+| 11 | b9bfc9a (main) | selective: fight only mechs that are after us, keep away from idle bots | pending |
+| 12 | 54e454e (exp-j-evasive) | selective + avoid idle bots within 140 m + no chasing | pending |
+| 13 | 62c243b (exp-k-noavoid) | selective targeting only, no avoidance | pending |
