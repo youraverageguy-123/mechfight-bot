@@ -34,6 +34,12 @@ export const P = {
   peek: true, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
+  kiteMulti: true, // with 2+ threats close: back away from their centre while fighting the nearest
+  kiteR: 200, // threats within this range count
+  kiteMinN: 2, // ...when at least this many
+  kiteAway: 0.85, // weight of backing away (vs strafing 0.5)
+  targetHpW: 0.06, // target score = distance * 0.6 + hp * this (higher = finish wounded mechs first)
+  silent: false, // walk under the step-sound speed when no threat is engaged
   lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
   pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
@@ -48,8 +54,9 @@ export const P = {
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
   threatNear: 35, // anything closer than this counts as a threat
-  avoidR: 90, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
+  avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
+  salt: 0, // mixed into our RNG seed: same strategy, different random choices
 }
 
 type Enemy = {
@@ -113,6 +120,7 @@ export class Brain {
   campRoof: Roof | null = null
   descendComp = -1
   tickStart = 0
+  engagedNow: (Enemy & { d: number })[] = []
   /** Milliseconds left for optional searches this decision (the hard limit is 50 ms). */
   private budget(): number {
     return P.tickBudgetMs - (now() - this.tickStart)
@@ -141,7 +149,7 @@ export class Brain {
     this.map = map
     this.nav = new Navigator(map)
     this.roofs = new RoofIndex(map)
-    this.rnd = makeRng(hello.seed)
+    this.rnd = makeRng((hello.seed ^ (P.salt * 2654435761)) >>> 0)
     this.myId = hello.slot
   }
 
@@ -363,7 +371,7 @@ export class Brain {
     let bestScore = Infinity
     for (const e of mechs) {
       if (!e.los || e.d > maxDirect + 20 || !isThreat(e)) continue
-      let s = e.d * 0.6 + e.hp * 0.06
+      let s = e.d * 0.6 + e.hp * P.targetHpW
       if (t - e.lastHurtUs < 3) s -= 40
       if (s < bestScore) {
         bestScore = s
@@ -805,6 +813,7 @@ export class Brain {
 
     if (fightMove && focus) {
       this.mode = this.retreating ? "retreat-fight" : "fight"
+      this.engagedNow = engaged
       move = this.fightMove(me, focus, t)
       boost = me.energy > 60 && !lightning
       // lightning shorts lasers and out-damages everything up close: rush in
@@ -882,8 +891,16 @@ export class Brain {
       }
     }
 
+    // silent creeping: under the step-sound speed unless fighting, fleeing or racing the zone
+    if (P.silent && !fighting && !this.retreating && !boost && !this.climbing && !descend &&
+      this.mode !== "zone" && this.mode !== "escape" && this.mode !== "drop") {
+      const sl = (this.cfg.sound.step_speed ?? 5) * 0.92 / (st.walk_speed ?? 11.7)
+      const ml = Math.hypot(move[0], move[1])
+      if (ml > sl) move = [(move[0] / ml) * sl, (move[1] / ml) * sl]
+    }
+
     // stuck recovery
-    const commanded = Math.hypot(move[0], move[1]) > 0.5
+    const commanded = Math.hypot(move[0], move[1]) > 0.3
     if (!this.climbing && !this.campRoof && this.mode !== "descend" && this.nav.updateStuck(t, x, y, commanded && this.mode !== "fight", move, this.rnd)) {
       move = this.nav.stuckDir
       if (me.grounded && this.nav.stuckCount % 2 === 0) jump = true
@@ -941,6 +958,27 @@ export class Brain {
     const band = this.band(me)
     const by = Math.atan2(e.pos[1] - y, e.pos[0] - x)
     const fx = Math.cos(by), fy = Math.sin(by)
+    if (P.kiteMulti) {
+      // several hunters closing in: back away from their centre so they reach us one at a time
+      const near = this.engagedNow.filter((q) => q.d < P.kiteR)
+      if (near.length >= P.kiteMinN) {
+        let cx = 0, cy = 0
+        for (const q of near) {
+          cx += q.pos[0] / near.length
+          cy += q.pos[1] / near.length
+        }
+        const [ax, ay] = norm2(x - cx, y - cy)
+        this.updateStrafe(t)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const m = norm2(ax * P.kiteAway - fy * this.strafeSign * 0.5, ay * P.kiteAway + fx * this.strafeSign * 0.5)
+          if (this.walkOk(x, y, x + m[0] * 4, y + m[1] * 4)) {
+            this.mode = "kite"
+            return m
+          }
+          this.strafeSign = -this.strafeSign
+        }
+      }
+    }
     let radial = 0
     if (this.retreating) radial = -0.8
     else if (e.d > band[1]) radial = 0.8

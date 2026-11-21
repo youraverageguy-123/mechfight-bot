@@ -58,6 +58,12 @@ function zoneAt(z: any, t: number) {
 }
 
 let SR: () => number = Math.random
+// VISION=1: hunters know where we are only through squad vision (any house bot that sees us) or the
+// sounds we make (gun 320 m, laser 380, lightning 160, boost/jet 90, steps 40); otherwise they go to
+// the last known spot and search around it.
+const VISION = process.env.VISION === "1"
+const SQ = { lkX: NaN, lkY: NaN, lkT: -1e9 }
+const SND = { gun: -9, laser: -9, light: -9, boost: -9, step: -9 }
 // TIERS=1: every house bot is on the map from the start (visible, hittable). Hunters are activated
 // weakest first (ids 1-4 easy, 5-8 medium, 9-12 hard, 13-15 expert); the rest wander inside the zone.
 // NH=passive: idle bots fight back only once we hit them. NH=aggressive: they also shoot when they see us.
@@ -172,6 +178,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   let activated = 1
   const world: any = { npcs: [], cubes: [], offer: null }
   const shells: Shell[] = []
+  SQ.lkX = NaN; SQ.lkY = NaN; SQ.lkT = -1e9
+  SND.gun = SND.laser = SND.light = SND.boost = SND.step = -9
   const pickedAt: number[] = []
   let cratesBroken = 0
   const fired = [0, 0], hits = [0, 0]
@@ -228,6 +236,29 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       living.forEach((q, k) => (q.active = k < n))
     } else while (activated < want + 1 && activated < mechs.length) mechs[activated++].active = true
 
+    if (tick % 2 === 0 && VISION) {
+      let known = false
+      for (const q of mechs) {
+        if (q.id === 0 || !q.alive) continue
+        const d = Math.hypot(me.pos[0] - q.pos[0], me.pos[1] - q.pos[1])
+        if (d > 200) continue
+        const inF = d < 45 || Math.abs(angDiff(Math.atan2(me.pos[1] - q.pos[1], me.pos[0] - q.pos[0]), q.aim[0])) < Math.PI / 3
+        if (inF && map.clear(q.pos[0], q.pos[1], q.pos[2] + 8, me.pos[0], me.pos[1], me.pos[2] + 4.5, 0.5, 1)) {
+          known = true
+          break
+        }
+      }
+      if (!known) {
+        const near = (r: number) => mechs.some((q) => q.id > 0 && q.alive && Math.hypot(me.pos[0] - q.pos[0], me.pos[1] - q.pos[1]) < r)
+        known = (t - SND.gun < 0.2 && near(320)) || (t - SND.laser < 0.2 && near(380)) || (t - SND.light < 0.2 && near(160)) ||
+          (t - SND.boost < 0.2 && near(90)) || (t - SND.step < 0.2 && near(40))
+      }
+      if (known) {
+        SQ.lkX = me.pos[0]
+        SQ.lkY = me.pos[1]
+        SQ.lkT = t
+      }
+    }
     if (tick % 2 === 0) {
       // ---- decisions
       for (const m of mechs) {
@@ -286,6 +317,10 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       if (a.boost && ml > 0.1 && m.grounded) {
         m.energy -= cfg.mech.boost_drain * DT
         m.lastSpend = t
+      }
+      if (m.id === 0) {
+        if (a.boost && m.energy > 0 && (ml > 0.1 || !m.grounded)) SND.boost = t
+        if (m.grounded && Math.hypot(m.vel[0], m.vel[1]) > cfg.sound.step_speed) SND.step = t
       }
       const acc = cfg.mech.ground_accel * DT
       for (let k = 0; k < 2; k++) {
@@ -364,10 +399,12 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             const d = [Math.cos(pit) * Math.cos(yaw), Math.cos(pit) * Math.sin(yaw), Math.sin(pit)]
             const o = [m.pos[0] + d[0] * 3, m.pos[1] + d[1] * 3, m.pos[2] + 7 + d[2] * 3]
             fired[m.id === 0 ? 0 : 1]++
+            if (m.id === 0) SND.gun = t
             shots.push({ pos: o, vel: d.map((v) => v * w.stats.speed), owner: m.id, dmg: w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)) * (m.id === 0 ? Math.pow(1.15, applied.gun_damage ?? 0) : 1), life: w.stats.range / w.stats.speed })
           }
         } else if (w.kind === "lightning") {
           if (fire[s] && w.cooldown <= 0 && m.energy >= w.stats.energy) {
+            if (m.id === 0) SND.light = t
             w.cooldown = w.stats.cooldown
             m.energy -= w.stats.energy
             m.lastSpend = t
@@ -397,6 +434,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
           const release = (!fire[s] && w.charge >= w.stats.min_charge) || w.charge >= w.stats.charge + w.stats.hold_s
           if (release && w.charge > 0) {
             if (m.id !== 0) laserShots++
+            else SND.laser = t
             const frac = Math.min(1, w.charge / w.stats.charge)
             const dmg = w.stats.damage * (w.stats.min_frac + (1 - w.stats.min_frac) * frac)
             w.charge = 0
@@ -639,9 +677,33 @@ function houseAct(m: Mech, me: Mech, t: number, zone: any, shells: Shell[]) {
     if (m.active || hostile) {
       // chase: path to us (shared vision), climb when we are above and close
       const ca: any = {}
-      m.nav!.setGoal(me.pos[0], me.pos[1], t, x, y)
+      let gx = me.pos[0], gy = me.pos[1]
+      if (VISION) {
+        if (t - SQ.lkT > 60 || Number.isNaN(SQ.lkX)) return idleAct(m, me, t, zone)
+        gx = SQ.lkX
+        gy = SQ.lkY
+        if (Math.hypot(gx - x, gy - y) < 15 || (m.wgoal && t < m.wgoalT && m.wgoalT - t < 8.5)) {
+          // reached the last known spot without seeing us: search around it
+          if (!m.wgoal || t > m.wgoalT || Math.hypot(m.wgoal[0] - x, m.wgoal[1] - y) < 6) {
+            for (let k = 0; k < 12; k++) {
+              const a = SR() * Math.PI * 2, r = 10 + SR() * 40
+              const n = map.nodeOf(SQ.lkX + Math.cos(a) * r, SQ.lkY + Math.sin(a) * r)
+              if (map.isMain(n)) {
+                m.wgoal = [map.nodeX(n), map.nodeY(n)]
+                break
+              }
+            }
+            m.wgoalT = t + 8
+          }
+          if (m.wgoal) {
+            gx = m.wgoal[0]
+            gy = m.wgoal[1]
+          }
+        }
+      }
+      m.nav!.setGoal(gx, gy, t, x, y)
       ca.move = m.nav!.steer(x, y)
-      ca.aim = [Math.atan2(me.pos[1] - y, me.pos[0] - x), 0]
+      ca.aim = [VISION ? Math.atan2(ca.move[1], ca.move[0]) || m.aim[0] : Math.atan2(me.pos[1] - y, me.pos[0] - x), 0]
       ca.boost = d > 150
       if (me.pos[2] > m.pos[2] + 4 && d < 60) {
         ca.move = [Math.cos(Math.atan2(me.pos[1] - y, me.pos[0] - x)), Math.sin(Math.atan2(me.pos[1] - y, me.pos[0] - x))]
