@@ -56,7 +56,7 @@ export const P = {
   threatNear: 35, // anything closer than this counts as a threat
   avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
-  salt: 0, // mixed into our RNG seed: same strategy, different random choices
+  salt: 2, // mixed into our RNG seed: same strategy, different random choices
 }
 
 type Enemy = {
