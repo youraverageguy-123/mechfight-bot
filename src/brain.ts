@@ -56,7 +56,7 @@ export const P = {
   threatNear: 60, // anything closer than this counts as a threat
   avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
-  salt: 0, // mixed into our RNG seed: same strategy, different random choices
+  salt: 1, // mixed into our RNG seed: same strategy, different random choices
   // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
   iso: true, // fight movement: try 16 spots 6 m around us, keep line of sight to the target, stay hidden from the rest
   isoOthersR: 170, // other mechs within this range count as watchers
