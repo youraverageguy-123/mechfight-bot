@@ -48,7 +48,7 @@ export const P = {
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
   threatNear: 35, // anything closer than this counts as a threat
-  avoidR: 90, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
+  avoidR: 40, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
 }
 
