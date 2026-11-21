@@ -3,7 +3,7 @@
 //   node tools/sim.ts [seeds=10] [hunterSkill=0.6] [giveWeapon=none|lightning|laser|mortar]
 import { readFileSync } from "node:fs"
 import { gunzipSync } from "node:zlib"
-import { Brain } from "../src/brain.ts"
+import { Brain, P } from "../src/brain.ts"
 import { GameMap } from "../src/map.ts"
 import { Navigator } from "../src/nav.ts"
 import { leadStraight } from "../src/aim.ts"
@@ -17,6 +17,7 @@ const cfg = HELLO.config
 const map = new GameMap(HELLO.map.dir, cfg.mech)
 const DT = 1 / cfg.match.tick_hz
 
+type Item = { id: number; kind: string; pos: number[]; crate?: boolean; hp?: number }
 type Shot = { pos: number[]; vel: number[]; owner: number; dmg: number; life: number }
 type Mech = {
   id: number; pos: number[]; vel: number[]; aim: number[]; cmdAim: number[]; hp: number; maxHp: number; energy: number
@@ -53,7 +54,7 @@ function zoneAt(z: any, t: number) {
   return [z.center[0] + (z.next_center[0] - z.center[0]) * f, z.center[1] + (z.next_center[1] - z.center[1]) * f, z.radius + (z.next_radius - z.radius) * f]
 }
 
-function runMatch(seed: number, skill: number, give: string, nHunters: number) {
+function runMatch(seed: number, skill: number, give: string, nHunters: number, armed: boolean) {
   const rnd = makeRng(seed * 7919 + 1)
   const spawns: number[][] = []
   const z0 = zoneInfo(0)
@@ -72,6 +73,25 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
   }))
   if (give !== "none") mechs[0].weapons[1] = { kind: give, cooldown: 0, charge: 0, stats: { ...cfg.weapons[give] } }
   for (let i = 1; i < mechs.length; i++) mechs[i].nav = new Navigator(map)
+  const KINDS = ["laser", "lightning"] // no mortar physics in this sim
+  const mkW = (k: string) => ({ kind: k, cooldown: 0, charge: 0, stats: { ...cfg.weapons[k] } })
+  if (armed)
+    for (let i = 1; i < mechs.length; i++) {
+      const r = rnd()
+      if (r < 0.35) mechs[i].weapons[1] = mkW("laser")
+      else if (r < 0.7) mechs[i].weapons[1] = mkW("lightning")
+    }
+  const items: Item[] = []
+  let nextId = 8000
+  const randNode = () => {
+    for (;;) {
+      const x = map.bminX + rnd() * (map.bmaxX - map.bminX), y = map.bminY + rnd() * (map.bmaxY - map.bminY)
+      const n = map.nodeOf(x, y)
+      if (map.isMain(n)) return [map.nodeX(n), map.nodeY(n), map.nodeZ(n)]
+    }
+  }
+  for (let k = 0; k < 30; k++) items.push({ id: nextId++, kind: KINDS[Math.floor(rnd() * KINDS.length)], pos: randNode() })
+  for (let k = 0; k < 27; k++) items.push({ id: 1000 + k, kind: "crate", pos: randNode(), crate: true, hp: 300 })
   const brain = new Brain({ ...HELLO, slot: 0, seed: seed }, map)
   const shots: Shot[] = []
   let kills = 0
@@ -83,6 +103,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
   let still = 0
   const dur = cfg.match.duration_s
   let activated = 1
+  const pickedAt: number[] = []
+  let cratesBroken = 0
   const fired = [0, 0], hits = [0, 0]
   const modes: Record<string, number> = {}
 
@@ -122,7 +144,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
       for (const m of mechs) {
         if (!m.alive) continue
         if (m.id === 0) {
-          const obs = buildObs(m, mechs, shots, zone, t, tick)
+          const obs = buildObs(m, mechs, shots, zone, t, tick, items)
           const t0 = performance.now()
           m.act = brain.act(obs)
           modes[brain.mode] = (modes[brain.mode] ?? 0) + 1
@@ -130,6 +152,23 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
           tms.push(ms)
           if (ms > maxMs) maxMs = ms
           m.events = []
+          const tk = m.act.take
+          if (tk != null) {
+            const ii = items.findIndex((it) => it.id === tk && !it.crate)
+            const it = items[ii]
+            if (it && Math.hypot(it.pos[0] - m.pos[0], it.pos[1] - m.pos[1]) < cfg.loot.pickup_radius && !m.weapons.some((w) => w && w.kind === it.kind)) {
+              const slot = m.weapons[1] == null ? 1 : m.act.drop != null ? m.act.drop : -1
+              if (slot >= 0) {
+                if (m.weapons[slot]) items.push({ id: nextId++, kind: m.weapons[slot].kind, pos: m.pos.slice() })
+                const w: any = mkW(it.kind)
+                w.cooldown = Math.max(cfg.loot.equip_s, w.stats.cooldown ?? 0)
+                m.weapons[slot] = w
+                items.splice(ii, 1)
+                m.events.push({ type: "took", id: it.id, kind: it.kind, slot })
+                pickedAt.push(Math.round(t))
+              } else m.events.push({ type: "take_failed", id: tk, reason: "full" })
+            } else m.events.push({ type: "take_failed", id: tk, reason: "range" })
+          }
         } else if (m.active) m.act = hunterAct(m, me, t, zone)
         else m.act = {}
       }
@@ -258,6 +297,21 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
         s.pos[1] += (s.vel[1] * DT) / sub
         s.pos[2] += (s.vel[2] * DT) / sub
         if (!map.clear(ox, oy, oz, s.pos[0], s.pos[1], s.pos[2], 0, 0)) { dead = true; break }
+        for (let ci = items.length - 1; ci >= 0 && !dead; ci--) {
+          const c = items[ci]
+          if (!c.crate) continue
+          if (Math.hypot(s.pos[0] - c.pos[0], s.pos[1] - c.pos[1]) < 1.7 && s.pos[2] > c.pos[2] - 0.2 && s.pos[2] < c.pos[2] + 2.5) {
+            dead = true
+            c.hp! -= s.dmg
+            if (s.owner === 0) mechs[0].events.push({ type: "hit", target: c.id, amount: s.dmg, weapon: "gun" })
+            if (c.hp! <= 0) {
+              items.splice(ci, 1)
+              if (s.owner === 0) cratesBroken++
+              if (rnd() < cfg.loot.crate_weapon_chance) items.push({ id: nextId++, kind: KINDS[Math.floor(rnd() * KINDS.length)], pos: c.pos.slice() })
+            }
+          }
+        }
+        if (dead) break
         for (const m of mechs) {
           if (!m.alive || m.id === s.owner || !m.active) continue
           if (Math.hypot(s.pos[0] - m.pos[0], s.pos[1] - m.pos[1]) < 2.5 + 0.3 && s.pos[2] > m.pos[2] && s.pos[2] < m.pos[2] + 9) {
@@ -287,7 +341,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number) {
   const before = mechs.filter((m) => m.id > 0 && m.diedAt < me.diedAt).length
   const place = 16 - before
   tms.sort((a, b) => a - b)
-  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
 }
 
 function gauss(r: () => number) {
@@ -326,6 +380,17 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
     act.aim = [sol.yaw + (Math.random() - 0.5) * 0.02 * (1 - m.skill), sol.pitch]
     const err = Math.abs(angDiff(m.aim[0], sol.yaw))
     act.fire = [err < 0.05, false]
+    const w1 = m.weapons[1]
+    if (w1 && w1.kind === "lightning") {
+      act.fire[1] = d < w1.stats.range - 2 && err < 0.2
+      if (d > 35) act.move = [Math.cos(b) * 0.9 - Math.sin(b) * m.strafe * 0.4, Math.sin(b) * 0.9 + Math.cos(b) * m.strafe * 0.4]
+    } else if (w1 && w1.kind === "laser") {
+      const full = w1.charge >= w1.stats.charge
+      const yawTo = Math.atan2(me.pos[1] - y, me.pos[0] - x)
+      act.aim = [yawTo, Math.atan2(me.pos[2] + 4.5 - m.pos[2] - 7, d)]
+      const e2 = Math.abs(angDiff(m.aim[0], yawTo))
+      act.fire[1] = w1.cooldown <= 0 && !(full && e2 < Math.atan2(2, d) * (0.5 + m.skill))
+    }
   } else {
     m.nav!.setGoal(me.pos[0], me.pos[1], t, x, y)
     act.move = m.nav!.steer(x, y)
@@ -341,7 +406,17 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
   return act
 }
 
-function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, tick: number) {
+function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, tick: number, items: Item[]) {
+  const pk: any[] = [], cr: any[] = []
+  for (const it of items) {
+    const d = Math.hypot(it.pos[0] - m.pos[0], it.pos[1] - m.pos[1])
+    const b = Math.atan2(it.pos[1] - m.pos[1], it.pos[0] - m.pos[0])
+    const inFov = d < cfg.vision.range && Math.abs(angDiff(b, m.aim[0])) < (cfg.vision.fov_deg * Math.PI) / 360
+    if (!(d < cfg.vision.near_range || inFov)) continue
+    if (!map.clear(m.pos[0], m.pos[1], m.pos[2] + 8, it.pos[0], it.pos[1], it.pos[2] + 1, 0.5, 0.5)) continue
+    if (it.crate) cr.push({ id: it.id, pos: it.pos.slice(), hp: it.hp })
+    else pk.push({ id: it.id, kind: it.kind, pos: it.pos.slice() })
+  }
   const vis: any[] = []
   for (const o of mechs) {
     if (o === m || !o.alive || !o.active) continue
@@ -362,7 +437,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
       grounded: true, cubes: m.cubes, upgrades: [], weapons: m.weapons.map((w) => (w ? { ...w } : null)), in_zone: Math.hypot(m.pos[0] - zx, m.pos[1] - zy) <= zr,
       stats: { ...cfg.mech },
     },
-    mechs: vis, projectiles, crates: [], cubes: [], pickups: [], sounds: [], beams: [], events: m.events.slice(), drops: [], zone, offer: null,
+    mechs: vis, projectiles, crates: cr, cubes: [], pickups: pk, sounds: [], beams: [], events: m.events.slice(), drops: [], zone, offer: null,
   } as any
 }
 
@@ -370,9 +445,11 @@ const seeds = Number(process.argv[2] ?? 10)
 const skill = Number(process.argv[3] ?? 0.6)
 const give = process.argv[4] ?? "none"
 const nH = Number(process.argv[5] ?? 15)
+const armed = (process.argv[6] ?? "1") === "1"
+if (process.argv[7]) Object.assign(P, JSON.parse(process.argv[7]))
 const res = []
 for (let s = 1; s <= seeds; s++) {
-  const r = runMatch(s, skill, give, nH)
+  const r = runMatch(s, skill, give, nH, armed)
   res.push(r)
   console.log(JSON.stringify(r))
 }

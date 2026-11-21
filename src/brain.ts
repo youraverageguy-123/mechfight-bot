@@ -14,6 +14,8 @@ export const P = {
   lightningReserve: 12, // energy kept back
   farmUntil: 230, // farm crates / drones before this match time
   farmMinHp: 0.55,
+  exploreUntil: 240, // look for a second weapon until this match time
+  multiRetreatFrac: 0.45, // retreat below this when 2+ enemies are on us
   gunBand: [35, 120] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
@@ -69,6 +71,10 @@ export class Brain {
   strafeFlip = 0
   shortUntil = -1
   scanYaw = 0
+  expX = NaN
+  expY = NaN
+  expT = -1e9
+  visited = new Map<number, number>()
   escX = NaN
   escY = NaN
   escT = -1e9
@@ -320,7 +326,9 @@ export class Brain {
       const ttkThem = f.hp / this.myDps(me, f.d)
       const finishing = f.los && f.hp < 0.35 * me.hp && ttkThem < 2.5 && ttkThem < ttkUs * 0.8
       if (!this.retreating) {
-        if ((hpFrac < P.retreatFrac && !finishing) || (ttkUs < ttkThem * 0.6 && hpFrac < 0.7 && !finishing)) {
+        const shooters = engaged.filter((e) => e.los || t - e.lastHurtUs < 3).length
+        if ((hpFrac < P.retreatFrac && !finishing) || (ttkUs < ttkThem * 0.6 && hpFrac < 0.7 && !finishing) ||
+          (shooters >= 2 && hpFrac < P.multiRetreatFrac && !finishing)) {
           this.retreating = true
           this.coverT = -1e9
         }
@@ -579,6 +587,17 @@ export class Brain {
       }
     }
 
+    // explore for a weapon while we only have the gun
+    this.markVisited(x, y, t)
+    if (!goal && !fightMove && !fighting && !target && !slot1 && hpFrac > 0.4 && t < P.exploreUntil) {
+      const reached = Math.hypot(this.expX - x, this.expY - y) < 12
+      if (Number.isNaN(this.expX) || reached || t - this.expT > 30 || !this.safe(obs, this.expX, this.expY, 25, 15)) this.pickExplore(obs)
+      if (!Number.isNaN(this.expX)) {
+        goal = [this.expX, this.expY]
+        this.mode = "explore"
+      }
+    }
+
     // hold near cover inside the next circle
     if (!goal && !fightMove) {
       if (t - this.holdT > 6 || Number.isNaN(this.holdX) || !this.safe(obs, this.holdX, this.holdY, 20, 6)) this.pickHold(obs)
@@ -807,6 +826,53 @@ export class Brain {
       const [ux, uy] = norm2(tx + zx * 0.5, ty + zy * 0.5)
       this.coverX = x + ux * 30
       this.coverY = y + uy * 30
+    }
+  }
+
+  private visitKey(x: number, y: number): number {
+    const i = Math.floor((x - this.map.minX) / 40)
+    const j = Math.floor((y - this.map.minY) / 40)
+    return j * 1000 + i
+  }
+
+  /** Remember which 40 m cells we have looked at (we see ~45 m around us). */
+  private markVisited(x: number, y: number, t: number) {
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const cx = x + di * 30, cy = y + dj * 30
+        this.visited.set(this.visitKey(cx, cy), t)
+      }
+  }
+
+  /** A reachable spot in an area we have not seen yet, inside where the zone will be. */
+  private pickExplore(obs: Observation) {
+    const [x, y] = obs.self.pos
+    const m = this.map
+    const t = obs.t
+    this.expT = t
+    let best = -1
+    let bs = Infinity
+    for (let k = 0; k < 40; k++) {
+      const r = 50 + this.rnd() * 170
+      const ang = this.rnd() * TAU
+      const sx = x + Math.cos(ang) * r, sy = y + Math.sin(ang) * r
+      const n = m.nearestNode(sx, sy, 2, (q) => m.isMain(q))
+      if (n < 0) continue
+      const nx = m.nodeX(n), ny = m.nodeY(n)
+      if (!this.safe(obs, nx, ny, 30, 25)) continue
+      const seen = this.visited.get(this.visitKey(nx, ny))
+      const age = seen === undefined ? 300 : t - seen
+      // unseen ground first, nearer is better, drift toward the next circle
+      const zc = obs.zone.next_center
+      const s = -Math.min(age, 300) + r * 0.6 + Math.hypot(nx - zc[0], ny - zc[1]) * 0.15
+      if (s < bs) {
+        bs = s
+        best = n
+      }
+    }
+    if (best >= 0) {
+      this.expX = m.nodeX(best)
+      this.expY = m.nodeY(best)
     }
   }
 
