@@ -18,7 +18,7 @@ export const P = {
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
-  peek: true, // vs laser carriers, fight from a spot next to cover
+  peek: false, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
