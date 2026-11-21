@@ -43,7 +43,7 @@ export const P = {
   lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
   pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
-  gunBand: [35, 120] as [number, number],
+  gunBand: [60, 160] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
   upgrades: ["armor", "plating", "nanites", "gun_rate", "gun_damage", "lightning_efficiency", "laser_damage", "laser_charge",
