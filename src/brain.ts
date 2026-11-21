@@ -18,6 +18,9 @@ export const P = {
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
+  peek: true, // vs laser carriers, fight from a spot next to cover
+  peekMinD: 20,
+  duck: true, // hide from lasers being charged at us
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
   gunBand: [35, 120] as [number, number],
   lightningBand: [14, 32] as [number, number],
@@ -74,6 +77,15 @@ export class Brain {
   strafeFlip = 0
   shortUntil = -1
   scanYaw = 0
+  missD: number[] = []
+  stats = { duckSeen: 0, duckFound: 0, charging: 0 }
+  peekX = NaN
+  peekY = NaN
+  peekT = -1e9
+  peekId = -1
+  duckX = NaN
+  duckY = NaN
+  duckT = -1e9
   expX = NaN
   expY = NaN
   expT = -1e9
@@ -643,6 +655,25 @@ export class Brain {
       }
     }
 
+    // a laser is being charged at us: it is hitscan and the shooter tracks us, so strafing can't
+    // dodge it. The charge shows for ~0.8 s; get the whole body behind something solid in that time.
+    if (P.duck) {
+      this.stats.charging += obs.mechs.filter((m) => m.kind === "mech" && m.charging).length
+      const chargers = obs.mechs.filter((m) => m.kind === "mech" && m.charging && this.aimedAtUs(m, x, y, z))
+      if (chargers.length > 0) {
+        const spot = this.duckSpot(t, chargers, x, y, z)
+        this.stats.duckSeen++
+        if (spot) this.stats.duckFound++
+        else this.missD.push(Math.round(Math.hypot(chargers[0].pos[0] - x, chargers[0].pos[1] - y)) + (this.mode === "peek" ? 1000 : 0))
+        if (spot) {
+          move = norm2(spot[0] - x, spot[1] - y)
+          if (Math.hypot(spot[0] - x, spot[1] - y) < 0.8) move = [0, 0]
+          boost = me.energy > 5
+          this.mode = "duck"
+        }
+      } else this.duckT = -1e9
+    }
+
     // stuck recovery
     const commanded = Math.hypot(move[0], move[1]) > 0.5
     if (this.nav.updateStuck(t, x, y, commanded && this.mode !== "fight", move, this.rnd)) {
@@ -708,6 +739,21 @@ export class Brain {
     else if (e.d < band[0]) radial = -0.7
     // enemy holds lightning and we don't: keep out of its arc
     if (!this.weapon(me, "lightning") && e.weapons.includes("lightning") && e.d < 55) radial = -0.9
+    // against a laser at range, fight from a spot with a hiding place next to it
+    if (P.peek && e.weapons.includes("laser") && e.d > P.peekMinD && !this.retreating) {
+      const pk = this.peekSpot(me, e, t)
+      if (pk) {
+        const dx = pk[0] - x, dy = pk[1] - y
+        const dl = Math.hypot(dx, dy)
+        this.mode = "peek"
+        if (dl > 1.5) {
+          if (this.map.walkLine(x, y, pk[0], pk[1])) return [dx / dl, dy / dl]
+          this.nav.setGoal(pk[0], pk[1], t, x, y)
+          return this.nav.steer(x, y)
+        }
+        return [0, 0]
+      }
+    }
     this.updateStrafe(t)
     for (let attempt = 0; attempt < 2; attempt++) {
       const sx = -fy * this.strafeSign, sy = fx * this.strafeSign
@@ -834,6 +880,121 @@ export class Brain {
       this.coverX = x + ux * 30
       this.coverY = y + uy * 30
     }
+  }
+
+  private aimedAtUs(m: ActorObs, x: number, y: number, z: number): boolean {
+    const d = Math.hypot(m.pos[0] - x, m.pos[1] - y)
+    if (d > (this.cfg.weapons.laser.range ?? 280) + 15) return false
+    const yawTo = Math.atan2(y - m.pos[1], x - m.pos[0])
+    if (Math.abs(angDiff(m.aim[0], yawTo)) > Math.atan2(6, d) + 0.06) return false
+    return this.map.clear(m.pos[0], m.pos[1], m.pos[2] + 7, x, y, z + 4.5, 3, 2)
+  }
+
+  /** Is a mech standing at (px,py,pz) fully hidden from every shooter? Checks the body's centre line and both sides. */
+  private bodyHidden(shooters: { pos: number[] }[], px: number, py: number, pz: number): boolean {
+    for (const s of shooters) {
+      const sx = s.pos[0], sy = s.pos[1], sz = s.pos[2] + 7
+      const [ux, uy] = norm2(px - sx, py - sy)
+      const ox = -uy * 2.3, oy = ux * 2.3
+      const pts: [number, number, number][] = [
+        [px, py, pz + 4.5], [px, py, pz + 8.6], [px, py, pz + 1],
+        [px + ox, py + oy, pz + 4.5], [px - ox, py - oy, pz + 4.5],
+      ]
+      for (const [qx, qy, qz] of pts) if (this.map.clear(sx, sy, sz, qx, qy, qz, 3, 0.3)) return false
+    }
+    return true
+  }
+
+  /** A spot near us that can see `e` and has a fully hidden spot within a few metres (cached ~1 s). */
+  private peekSpot(me: SelfObs, e: Enemy, t: number): [number, number] | null {
+    if (this.peekId === e.id && t - this.peekT < 1 && !Number.isNaN(this.peekX)) return [this.peekX, this.peekY]
+    this.peekId = e.id
+    this.peekT = t
+    this.peekX = NaN
+    const m = this.map
+    const [x, y] = me.pos
+    const ez = e.pos[2] + 7
+    type S = { x: number; y: number; vis: boolean; hid: boolean }
+    const pts: S[] = []
+    const radii = [0, 4, 8, 12, 16, 21, 27]
+    for (const r of radii)
+      for (let k = 0; k < (r === 0 ? 1 : 12); k++) {
+        const a = (k / 12) * TAU + r * 0.1
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r
+        const c = m.idx(px, py)
+        if (!m.walk1[c]) continue
+        const n = m.nodeOf(px, py)
+        if (r > 0 && !m.isMain(n) && m.nearestNode(px, py, 1, (q) => m.isMain(q)) < 0) continue
+        const pz = m.surf[c]
+        const vis = m.clear(e.pos[0], e.pos[1], ez, px, py, pz + 4.5, 3, 1)
+        const hid = !vis && this.bodyHidden([e], px, py, pz)
+        pts.push({ x: px, y: py, vis, hid })
+      }
+    const hidden = pts.filter((p) => p.hid)
+    let best: S | null = null
+    let bs = Infinity
+    for (const p of pts) {
+      if (!p.vis) continue
+      let near = false
+      for (const h of hidden) {
+        const d = Math.hypot(h.x - p.x, h.y - p.y)
+        if (d <= 6.5 && m.walkLine(p.x, p.y, h.x, h.y)) {
+          near = true
+          break
+        }
+      }
+      if (!near) continue
+      const s = Math.hypot(p.x - x, p.y - y)
+      if (s < bs) {
+        bs = s
+        best = p
+      }
+    }
+    if (!best) return null
+    this.peekX = best.x
+    this.peekY = best.y
+    return [best.x, best.y]
+  }
+
+  /** Nearest spot we can walk to in a straight line that hides us from the chargers (cached briefly). */
+  private duckSpot(t: number, chargers: ActorObs[], x: number, y: number, z: number): [number, number] | null {
+    const m = this.map
+    if (t - this.duckT < 0.35 && !Number.isNaN(this.duckX)) {
+      const c = m.idx(this.duckX, this.duckY)
+      if (this.bodyHidden(chargers, this.duckX, this.duckY, m.surf[c])) return [this.duckX, this.duckY]
+    }
+    this.duckT = t
+    if (this.bodyHidden(chargers, x, y, z)) {
+      this.duckX = x
+      this.duckY = y
+      return [x, y]
+    }
+    // prefer directions away from the shooter at equal distance
+    const c0 = chargers[0]
+    const away = Math.atan2(y - c0.pos[1], x - c0.pos[0])
+    for (const r of [2.5, 4, 5.5, 7, 8.5, 10]) {
+      let best: [number, number] | null = null
+      let bs = Infinity
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * TAU
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r
+        const c = m.idx(px, py)
+        if (!m.walk1[c] || !m.walkLine(x, y, px, py)) continue
+        if (!this.bodyHidden(chargers, px, py, m.surf[c])) continue
+        const s = Math.abs(angDiff(a, away))
+        if (s < bs) {
+          bs = s
+          best = [px, py]
+        }
+      }
+      if (best) {
+        this.duckX = best[0]
+        this.duckY = best[1]
+        return best
+      }
+    }
+    this.duckX = NaN
+    return null
   }
 
   private visitKey(x: number, y: number): number {

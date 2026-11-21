@@ -96,6 +96,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const shots: Shot[] = []
   let kills = 0
   let dmgIn = 0, dmgOut = 0
+  const byW: Record<string, number> = {}
+  let laserShots = 0
   let stuckTicks = 0
   let maxMs = 0
   const tms: number[] = []
@@ -117,7 +119,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     if (by) by.lastDmg = t
     vi.events.push({ type: "damaged", amount: amt, weapon, bearing: by ? bearing : null, by: by ? by.id : null, rear: !!rear })
     if (by) by.events.push({ type: "hit", target: vi.id, amount: amt, weapon })
-    if (vi.id === 0) dmgIn += amt
+    if (vi.id === 0) { dmgIn += amt; byW[weapon] = (byW[weapon] ?? 0) + Math.round(amt) }
     if (by && by.id === 0) dmgOut += amt
     if (vi.hp <= 0 && vi.alive) {
       vi.alive = false
@@ -272,6 +274,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
           if (fire[s] && w.cooldown <= 0) w.charge = Math.min(w.stats.charge + w.stats.hold_s, w.charge + DT)
           const release = (!fire[s] && w.charge >= w.stats.min_charge) || w.charge >= w.stats.charge + w.stats.hold_s
           if (release && w.charge > 0) {
+            if (m.id !== 0) laserShots++
             const frac = Math.min(1, w.charge / w.stats.charge)
             const dmg = w.stats.damage * (w.stats.min_frac + (1 - w.stats.min_frac) * frac)
             w.charge = 0
@@ -345,7 +348,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const before = mechs.filter((m) => m.id > 0 && m.diedAt < me.diedAt).length
   const place = 16 - before
   tms.sort((a, b) => a - b)
-  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
 }
 
 function gauss(r: () => number) {
