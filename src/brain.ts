@@ -16,16 +16,16 @@ export const P = {
   farmUntil: 230, // farm crates / drones before this match time
   farmMinHp: 0.55,
   farmRange: 250, // walk this far for crates / drones
-  droneValue: 250, // metres of detour a drone (2 cubes) is worth over a crate; 0 = don't seek drones
+  droneValue: 0, // metres of detour a drone (2 cubes) is worth over a crate; 0 = don't seek drones
   cubeRange: 160, // walk this far for cubes when no enemy is in sight
   cubeFightRange: 30, // ...and this far while enemies are around
-  exploreUntil: 240, // look for a second weapon until this match time
-  multiRetreatFrac: 0.45,
+  exploreUntil: 0, // look for a second weapon until this match time
+  multiRetreatFrac: 0.65,
   hunt: true, // chase enemies we lost sight of
   huntRange: 160, // ...up to this far
   huntMinHp: 0.55, // ...while above this HP fraction
   closeBoost: false, // boost while closing in on a target beyond our range band
-  holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
+  holdCoverW: -1, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   roof: false, // camp on rooftops (sim: survives longer but kills less, so off)
   roofFrom: 45, // earliest match time to head for a roof
   roofWeaponGrace: 60, // ...or this much later even with only the gun
@@ -37,10 +37,10 @@ export const P = {
   lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
   pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
-  gunBand: [35, 120] as [number, number],
+  gunBand: [60, 160] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
-  upgrades: ["armor", "plating", "nanites", "gun_rate", "gun_damage", "lightning_efficiency", "laser_damage", "laser_charge",
+  upgrades: ["gun_rate", "gun_damage", "laser_damage", "laser_charge", "lightning_efficiency", "armor", "plating", "nanites",
     "gyros", "mortar_reload", "lightning_range", "lightning_chain", "gun_mag", "gun_velocity", "sensors", "servos", "capacitor",
     "reactor", "jets", "mortar_splash", "mortar_velocity", "laser_pierce"],
   dropMinDist: 70, // no enemy this close to a drop
@@ -48,7 +48,7 @@ export const P = {
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
   threatNear: 35, // anything closer than this counts as a threat
-  avoidR: 90, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
+  avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
 }
 
