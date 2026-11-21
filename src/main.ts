@@ -3,6 +3,13 @@
 import { type BotAction, type Hello, log, type Observation, run } from "../mechfight.ts"
 import { Brain, P } from "./brain.ts"
 import { GameMap } from "./map.ts"
+import { existsSync } from "node:fs"
+
+/** hello.map.dir, or /arena if that path doesn't exist (e.g. a host path mangled by a test harness). */
+function mapDir(dir: string): string {
+  for (const d of [dir, "/arena", dir.replace(/\\/g, "/")]) if (d && existsSync(d + "/v2/world.json")) return d
+  return dir
+}
 
 function fallback(obs: Observation): BotAction {
   const me = obs.self
@@ -33,7 +40,7 @@ run((hello: Hello) => {
   let brain: Brain | null = null
   try {
     const t0 = performance.now()
-    const map = new GameMap(hello.map.dir, hello.config.mech)
+    const map = new GameMap(mapDir(hello.map.dir),hello.config.mech)
     brain = new Brain(hello, map)
     log(`map built in ${(performance.now() - t0).toFixed(0)} ms`)
   } catch (e) {
