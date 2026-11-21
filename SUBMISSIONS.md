@@ -26,12 +26,29 @@ woke up stronger idle bots. Sim rebuilt with the full tiered roster (TIERS=1).
 
 | 11 | b9bfc9a (main) | selective: fight only mechs that are after us, keep away from idle bots | **4.94** |
 | 12 | 54e454e (exp-j-evasive) | selective + avoid idle bots within 140 m + no chasing | 4.42 |
-| 13 | 62c243b (exp-k-noavoid) | selective targeting only, no avoidance | pending |
+| 13 | 62c243b (exp-k-noavoid) | selective targeting only, no avoidance | 4.75 |
 
 Real evidence so far: every less aggressive variant lost points (no chase 4.35-4.52, evasive 4.42).
 Map has almost no enclosed spots (30 of 32k have all sightlines < 60 m), so no closet ambush.
 A roof lies in the final r25 circle in ~48% of zone draws (~25% within 8 m of the last point).
 
-| 14 | 0292805 (exp-l-roof) | selective + rooftop camping from 45 s (do house bots climb?) | pending |
-| 15 | 5debac2 (exp-m-aggro) | selective + chase to 250 m, boost in, gun band 30-90 m, contest drops | pending |
-| 16 | 32ebfdb (exp-n-roof150) | selective + rooftop camping from 150 s | pending |
+| 14 | 0292805 (exp-l-roof) | selective + rooftop camping from 45 s (do house bots climb?) | 4.17 |
+| 15 | 5debac2 (exp-m-aggro) | selective + chase to 250 m, boost in, gun band 30-90 m, contest drops | 4.81 |
+| 16 | 32ebfdb (exp-n-roof150) | selective + rooftop camping from 150 s | 4.92 |
+
+Research (public repos of other teams, read-only): house bots tap-fire (0.4-0.6 s), aim sigma
+6 deg (easy) -> 1.6 deg (expert), lead 0.5 -> 1.0, reaction 0.9 -> 0.3 s. Squad model: hunters =
+weakest living, 1 + our kills, all of them from ~155-265 s. Sim rebuilt on these numbers (HOUSE=2)
+reproduces 7 of 10 real scores within ~0.5. In it we die at ~95 s with 3-6 hunters within 120 m.
+Per-match std 2.5 -> one real run of 48 matches carries about +-0.36 of luck.
+
+Sweep (25 single changes) -> mostly noise. Kiting away from 2+ converging hunters is the first robust
+gain: +0.77 / +1.23 / +0.71 (three house-bot models, 192 paired seeds). Silent creeping -1.0,
+lightning-first -0.86, rooftops -0.5..-1.1.
+
+| 17 | 4fecc6b (exp-o-combo) | sweep combo: avoid 60 m, multi-retreat 0.65, no drone/weapon detours, damage upgrades, gun 60-160 | pending |
+| 18 | b7ab306 (exp-p-avoid40) | selective, avoid idle bots within 40 m | pending |
+| 19 | 90d734b (main) | kite away from converging hunters (200 m) + avoid idle bots 60 m | pending |
+| 20 | 732b8ba (exp-q-kite-s1) | same as 19, RNG salt 1 (second draw) | pending |
+| 21 | a2bde0a (exp-r-kite-s2) | same as 19, RNG salt 2 (third draw) | pending |
+| 22 | ff4e37e (exp-s-kite-band) | 19 + gun band 60-160 m | pending |
