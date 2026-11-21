@@ -15,8 +15,8 @@ export const P = {
   lightningReserve: 12, // energy kept back
   farmUntil: 230, // farm crates / drones before this match time
   farmMinHp: 0.55,
-  farmRange: 250, // walk this far for crates / drones
-  droneValue: 250, // metres of detour a drone (2 cubes) is worth over a crate; 0 = don't seek drones
+  farmRange: 150, // walk this far for crates / drones
+  droneValue: 80, // metres of detour a drone (2 cubes) is worth over a crate; 0 = don't seek drones
   cubeRange: 160, // walk this far for cubes when no enemy is in sight
   cubeFightRange: 30, // ...and this far while enemies are around
   exploreUntil: 240, // look for a second weapon until this match time
