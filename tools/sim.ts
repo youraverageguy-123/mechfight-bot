@@ -26,6 +26,7 @@ type Mech = {
   nav?: Navigator; strafe: number; flip: number; skill: number; act: any; seen: Map<number, number>
   events: any[]; diedAt: number; grounded: boolean
   hitByUs: number; wgoal: number[] | null; wgoalT: number
+  tier: number; lastTap: number; aimErr: number[]; aimErrT: number; leadMul: number; losStart: number; lastLos: number
 }
 
 function gunW() {
@@ -65,6 +66,28 @@ const NH = process.env.NH ?? "passive"
 const TIER_SKILL = (process.env.SKILLS ?? "0.2,0.5,0.75,0.95").split(",").map(Number)
 const AIMN = Number(process.env.AIMN ?? 0.05)
 const present = (m: { active: boolean }) => TIERS || m.active
+// HOUSE=2: house bots modelled on measured replay numbers (tap-fire 0.4-0.6 s, aim sigma 6 -> 1.6 deg,
+// lead 0.5 -> 1.0, reaction 0.9 -> 0.3 s, 30-70 % pick up a weapon: laser:mortar:lightning = 7:6:3).
+// Squad: hunters = weakest living, 1 + our kills, ramping to all between RAMP0 and RAMP1 s.
+const HOUSE2 = process.env.HOUSE === "2"
+const RAMP0 = Number(process.env.RAMP0 ?? 155), RAMP1 = Number(process.env.RAMP1 ?? 265)
+const PERKILL = Number(process.env.PERKILL ?? 1)
+const HS = Number(process.env.HSCALE ?? 1) // aim-error scale (calibration knob)
+const DEFS = Number(process.env.DEFSCALE ?? 1) // idle bots' defend-range scale
+const HOSTS = Number(process.env.HOSTILE_S ?? 20) // how long an idle bot we hit keeps fighting us
+const H_REACT = [0.9, 0.55, 0.45, 0.3]
+const H_SIG = [6, 3.5, 2.6, 1.6].map((d) => (d * HS * Math.PI) / 180)
+const H_HOLD = [0.6, 0.5, 0.45, 0.4]
+const H_LEAD = [0.5, 0.8, 0.95, 1.0]
+const H_LN = [0.35, 0.25, 0.15, 0.1]
+const H_TAP = [0.6, 0.45, 0.4, 0.4]
+const H_TOL = [6, 4, 3, 2.5].map((d) => (d * Math.PI) / 180)
+const H_PREF = [70, 55, 55, 45]
+const H_DEF = [50, 60, 75, 90]
+const H_RET = [0, 0, 0.2, 0.3]
+const H_PICK = [0.3, 0.5, 0.7, 0.6]
+const H_STRAFE = [3.5, 2.5, 2.0, 1.6]
+type Shell = { tLand: number; x: number; y: number; owner: any }
 function runMatch(seed: number, skill: number, give: string, nHunters: number, armed: boolean) {
   SR = makeRng(seed * 104729 + 7)
   const rnd = makeRng(seed * 7919 + 1)
@@ -83,12 +106,21 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     weapons: [gunW(), null], alive: true, active: i === 0, lastDmg: -99, lastSpend: -99, cubes: 0,
     strafe: 1, flip: 0, skill: TIERS && i > 0 ? TIER_SKILL[Math.min(3, Math.floor((i - 1) / 4))] : skill, act: {}, seen: new Map(), events: [],
     diedAt: Infinity, grounded: true, hitByUs: -99, wgoal: null, wgoalT: 0,
+    tier: i > 0 ? Math.min(3, Math.floor((i - 1) / 4)) : 0, lastTap: -9, aimErr: [0, 0], aimErrT: 0, leadMul: 1, losStart: 0, lastLos: -99,
   }))
   if (give !== "none") mechs[0].weapons[1] = { kind: give, cooldown: 0, charge: 0, stats: { ...cfg.weapons[give] } }
   for (let i = 1; i < mechs.length; i++) mechs[i].nav = new Navigator(map)
   const KINDS = ["laser", "lightning"] // no mortar physics in this sim
   const mkW = (k: string) => ({ kind: k, cooldown: 0, charge: 0, stats: { ...cfg.weapons[k] } })
-  if (armed)
+  if (HOUSE2)
+    for (let i = 1; i < mechs.length; i++) {
+      const m = mechs[i]
+      if (rnd() < H_PICK[m.tier]) {
+        const r = rnd() * 16
+        m.weapons[1] = r < 7 ? mkW("laser") : r < 13 ? { kind: "mortar", cooldown: 0, charge: 0, stats: { ...cfg.weapons.mortar } } : mkW("lightning")
+      }
+    }
+  else if (armed)
     for (let i = 1; i < mechs.length; i++) {
       const r = rnd()
       if (r < 0.35) mechs[i].weapons[1] = mkW("laser")
@@ -125,6 +157,9 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const brain = new Brain({ ...HELLO, slot: 0, seed: seed }, map)
   const shots: Shot[] = []
   let kills = 0
+  const killT: number[] = []
+  let deathInfo: any = null
+  const dmgFrom: Record<string, number> = {}
   let dmgIn = 0, dmgOut = 0
   const byW: Record<string, number> = {}
   let laserShots = 0
@@ -136,6 +171,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const dur = cfg.match.duration_s
   let activated = 1
   const world: any = { npcs: [], cubes: [], offer: null }
+  const shells: Shell[] = []
   const pickedAt: number[] = []
   let cratesBroken = 0
   const fired = [0, 0], hits = [0, 0]
@@ -151,13 +187,26 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     if (by) by.lastDmg = t
     vi.events.push({ type: "damaged", amount: amt, weapon, bearing: by ? bearing : null, by: by ? by.id : null, rear: !!rear })
     if (by) by.events.push({ type: "hit", target: vi.id, amount: amt, weapon })
-    if (vi.id === 0) { dmgIn += amt; byW[weapon] = (byW[weapon] ?? 0) + Math.round(amt) }
+    if (vi.id === 0) {
+      dmgIn += amt
+      byW[weapon] = (byW[weapon] ?? 0) + Math.round(amt)
+      if (by) dmgFrom[by.id + ":" + ["e", "m", "h", "x"][by.tier]] = Math.round((dmgFrom[by.id + ":" + ["e", "m", "h", "x"][by.tier]] ?? 0) + amt)
+    }
     if (by && by.id === 0) { dmgOut += amt; vi.hitByUs = t }
     if (vi.hp <= 0 && vi.alive) {
       vi.alive = false
       vi.diedAt = t
       dropCubes(vi.pos, vi.cubes + cfg.cubes.death_drop_extra)
+      if (vi.id === 0) {
+        deathInfo = {
+          t: Math.round(t), hp0: Math.round(vi.maxHp), by: weapon,
+          near: mechs.filter((q) => q.id > 0 && q.alive && Math.hypot(q.pos[0] - vi.pos[0], q.pos[1] - vi.pos[1]) < 120).length,
+          hunters: mechs.filter((q) => q.id > 0 && q.alive && q.active).length,
+          dmgBy: Object.fromEntries(Object.entries(dmgFrom).sort((a: any, b: any) => b[1] - a[1]).slice(0, 4)),
+        }
+      }
       if (by && by.id === 0) {
+        killT.push(Math.round(t))
         kills++
         by.events.push({ type: "kill", target: vi.id })
       }
@@ -172,7 +221,12 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     // activation: one early, more as they die, all late
     const deadHunters = mechs.filter((m) => m.id > 0 && !m.alive).length
     const want = Math.min(nHunters, 1 + deadHunters + (t > 150 ? 1 : 0) + (t > 240 ? 2 : 0) + (t > 330 ? 99 : 0))
-    while (activated < want + 1 && activated < mechs.length) mechs[activated++].active = true
+    if (HOUSE2) {
+      const living = mechs.filter((q) => q.id > 0 && q.alive).sort((a, b) => a.tier - b.tier || a.id - b.id)
+      const ramp = t < RAMP0 ? 0 : ((t - RAMP0) / Math.max(1, RAMP1 - RAMP0)) * 15
+      const n = Math.min(living.length, Math.floor(1 + kills * PERKILL + ramp))
+      living.forEach((q, k) => (q.active = k < n))
+    } else while (activated < want + 1 && activated < mechs.length) mechs[activated++].active = true
 
     if (tick % 2 === 0) {
       // ---- decisions
@@ -208,7 +262,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
               } else m.events.push({ type: "take_failed", id: tk, reason: "full" })
             } else m.events.push({ type: "take_failed", id: tk, reason: "range" })
           }
-        } else if (m.active) m.act = hunterAct(m, me, t, zone)
+        } else if (HOUSE2) m.act = houseAct(m, me, t, zone, shells)
+        else if (m.active) m.act = hunterAct(m, me, t, zone)
         else if (TIERS) m.act = idleAct(m, me, t, zone)
         else m.act = {}
       }
@@ -414,6 +469,17 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       s.life -= DT
       if (dead || s.life <= 0) shots.splice(i, 1)
     }
+    for (let k = shells.length - 1; k >= 0; k--) {
+      const sh = shells[k]
+      if (t < sh.tLand) continue
+      shells.splice(k, 1)
+      const dd = Math.hypot(sh.x - me.pos[0], sh.y - me.pos[1])
+      const W = cfg.weapons.mortar
+      let amt = 0
+      if (dd < 2.5) amt = W.damage + W.splash
+      else if (dd < W.splash_radius) amt = W.splash * (1 - (1 - W.splash_edge) * (dd / W.splash_radius))
+      if (amt > 0) damage(me, amt, sh.owner, "mortar", sh.x, sh.y, t)
+    }
     // drones: shoot our bot if close (or attacked recently), hit 50% of the time
     for (const q of npcs) {
       q.cd -= DT
@@ -473,7 +539,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const before = mechs.filter((m) => m.id > 0 && m.diedAt < me.diedAt).length
   const place = 16 - before
   tms.sort((a, b) => a - b)
-  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), cubes: gotCubes, drones: dronesKilled, upg: applied, byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), cubes: gotCubes, drones: dronesKilled, killT, death: deathInfo, upg: applied, byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
 }
 
 function visList(m: any, list: any[], hz: number): any[] {
@@ -548,6 +614,93 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
     act.boost = !m.grounded && m.energy > 1
   }
   // stay in zone
+  const [zx, zy, zr] = zoneAt(zone, t + 10)
+  if (Math.hypot(x - zx, y - zy) > zr - 10) {
+    m.nav!.setGoal(zone.next_center[0], zone.next_center[1], t, x, y)
+    act.move = m.nav!.steer(x, y)
+  }
+  return act
+}
+
+/** Replay-calibrated house bot (HOUSE=2): hunters chase us anywhere; the others farm/wander and
+ * only fight us inside their defend range or after we hit them. */
+function houseAct(m: Mech, me: Mech, t: number, zone: any, shells: Shell[]) {
+  const T = m.tier
+  const [x, y] = m.pos
+  const d = Math.hypot(me.pos[0] - x, me.pos[1] - y)
+  const los = d < 200 && map.clear(x, y, m.pos[2] + 8, me.pos[0], me.pos[1], me.pos[2] + 4.5, 1, 1)
+  if (los) {
+    if (t - m.lastLos > 2) m.losStart = t
+    m.lastLos = t
+  }
+  const hostile = t - m.hitByUs < HOSTS
+  const engage = los && (m.active || hostile || d < H_DEF[T] * DEFS)
+  if (!engage) {
+    if (m.active || hostile) {
+      // chase: path to us (shared vision), climb when we are above and close
+      const ca: any = {}
+      m.nav!.setGoal(me.pos[0], me.pos[1], t, x, y)
+      ca.move = m.nav!.steer(x, y)
+      ca.aim = [Math.atan2(me.pos[1] - y, me.pos[0] - x), 0]
+      ca.boost = d > 150
+      if (me.pos[2] > m.pos[2] + 4 && d < 60) {
+        ca.move = [Math.cos(Math.atan2(me.pos[1] - y, me.pos[0] - x)), Math.sin(Math.atan2(me.pos[1] - y, me.pos[0] - x))]
+        ca.jump = m.grounded
+        ca.boost = !m.grounded && m.energy > 1
+      }
+      const [qx, qy, qr] = zoneAt(zone, t + 10)
+      if (Math.hypot(x - qx, y - qy) > qr - 10) {
+        m.nav!.setGoal(zone.next_center[0], zone.next_center[1], t, x, y)
+        ca.move = m.nav!.steer(x, y)
+      }
+      return ca
+    }
+    return idleAct(m, me, t, zone)
+  }
+  const act: any = { fire: [false, false] }
+  if (t >= m.aimErrT) {
+    m.aimErr = [gauss(SR) * H_SIG[T], gauss(SR) * H_SIG[T] * 0.5]
+    m.leadMul = H_LEAD[T] * (1 + gauss(SR) * H_LN[T])
+    m.aimErrT = t + H_HOLD[T]
+  }
+  if (t > m.flip) {
+    m.strafe = -m.strafe
+    m.flip = t + H_STRAFE[T] * (0.4 + SR() * 1.2)
+  }
+  const b = Math.atan2(me.pos[1] - y, me.pos[0] - x)
+  const w1 = m.weapons[1]
+  const pref = w1?.kind === "lightning" ? 28 : w1?.kind === "laser" ? 85 : w1?.kind === "mortar" ? 80 : H_PREF[T]
+  let rad = d > pref + 15 ? 0.8 : d < pref - 15 ? -0.6 : 0
+  if (m.hp / m.maxHp < H_RET[T]) rad = -1
+  const mv = [-Math.sin(b) * m.strafe + Math.cos(b) * rad, Math.cos(b) * m.strafe + Math.sin(b) * rad]
+  const ml = Math.hypot(mv[0], mv[1]) || 1
+  act.move = [mv[0] / ml, mv[1] / ml]
+  const v = [me.vel[0] * m.leadMul, me.vel[1] * m.leadMul, 0]
+  const sol = leadStraight(x, y, m.pos[2] + 7, me.pos[0], me.pos[1], me.pos[2] + 4.5, v[0], v[1], 0, 252, 3, me.pos[2] + 2, 22)
+  let yaw = sol.yaw + m.aimErr[0], pitch = sol.pitch + m.aimErr[1]
+  const ready = t - m.losStart >= H_REACT[T]
+  if (w1 && w1.kind === "laser" && (w1.charge > 0 || (w1.cooldown <= 0 && ready && d < 270))) {
+    // laser: aim straight at us (hitscan), with the same aim error
+    yaw = b + m.aimErr[0]
+    pitch = Math.atan2(me.pos[2] + 4.5 - m.pos[2] - 7, d) + m.aimErr[1]
+    const e2 = Math.abs(angDiff(m.aim[0], yaw))
+    const full = w1.charge >= w1.stats.charge
+    act.fire[1] = !(full && e2 < H_TOL[T])
+  } else {
+    const err = Math.abs(angDiff(m.aim[0], yaw))
+    if (ready && err < H_TOL[T] && t - m.lastTap >= H_TAP[T]) {
+      act.fire[0] = true
+      m.lastTap = t
+    }
+    if (w1 && w1.kind === "lightning") act.fire[1] = ready && d < w1.stats.range - 2 && err < 0.25
+    if (w1 && w1.kind === "mortar" && ready && w1.cooldown <= 0 && d > 15 && d < 230) {
+      const tf = d / 55 + 0.6
+      const ex = gauss(SR) * H_SIG[T] * d * 1.5, ey = gauss(SR) * H_SIG[T] * d * 1.5
+      shells.push({ tLand: t + tf, x: me.pos[0] + me.vel[0] * tf * m.leadMul + ex, y: me.pos[1] + me.vel[1] * tf * m.leadMul + ey, owner: m })
+      w1.cooldown = w1.stats.cooldown
+    }
+  }
+  act.aim = [yaw, pitch]
   const [zx, zy, zr] = zoneAt(zone, t + 10)
   if (Math.hypot(x - zx, y - zy) > zr - 10) {
     m.nav!.setGoal(zone.next_center[0], zone.next_center[1], t, x, y)
