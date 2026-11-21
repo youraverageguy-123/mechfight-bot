@@ -21,7 +21,7 @@ export const P = {
   cubeFightRange: 30, // ...and this far while enemies are around
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
-  hunt: true, // chase enemies we lost sight of
+  hunt: false, // chase enemies we lost sight of
   huntRange: 160, // ...up to this far
   huntMinHp: 0.55, // ...while above this HP fraction
   closeBoost: false, // boost while closing in on a target beyond our range band
@@ -46,7 +46,7 @@ export const P = {
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
   threatNear: 35, // anything closer than this counts as a threat
-  avoidR: 90, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
+  avoidR: 140, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
 }
 
