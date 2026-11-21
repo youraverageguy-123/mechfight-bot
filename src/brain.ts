@@ -24,7 +24,7 @@ export const P = {
   hunt: true, // chase enemies we lost sight of
   huntRange: 160, // ...up to this far
   huntMinHp: 0.55, // ...while above this HP fraction
-  closeBoost: false, // boost while closing in on a target beyond our range band
+  closeBoost: true, // boost while closing in on a target beyond our range band
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   roof: false, // camp on rooftops (sim: survives longer but kills less, so off)
   roofFrom: 45, // earliest match time to head for a roof
@@ -35,7 +35,7 @@ export const P = {
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
-  gunBand: [35, 120] as [number, number],
+  gunBand: [25, 70] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
   upgrades: ["armor", "plating", "nanites", "gun_rate", "gun_damage", "lightning_efficiency", "laser_damage", "laser_charge",
