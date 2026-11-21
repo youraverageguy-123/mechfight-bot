@@ -34,7 +34,7 @@ export const P = {
   peek: true, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
-  kiteMulti: true, // with 2+ threats close: back away from their centre while fighting the nearest
+  kiteMulti: false, // with 2+ threats close: back away from their centre while fighting the nearest
   kiteR: 200, // threats within this range count
   kiteMinN: 2, // ...when at least this many
   kiteAway: 0.85, // weight of backing away (vs strafing 0.5)
@@ -53,11 +53,28 @@ export const P = {
   // Practice house bots hunt us weakest first; the others are idle. Only fight mechs that are after
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
-  threatNear: 35, // anything closer than this counts as a threat
+  threatNear: 60, // anything closer than this counts as a threat
   avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
   salt: 0, // mixed into our RNG seed: same strategy, different random choices
+  // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
+  iso: true, // fight movement: try 16 spots 6 m around us, keep line of sight to the target, stay hidden from the rest
+  isoOthersR: 170, // other mechs within this range count as watchers
+  isoWatchW: 30, // penalty per watcher that would see us at a spot
+  isoLosW: 45, // bonus for keeping line of sight to the target (when our weapons are ready)
+  gunR: 85, laserR: 120, lightR: 28, // preferred fighting ranges for iso
+  loseRule: true, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
+  gTarget: true, // target score: distance + 0.18 HP, minus big bonuses for wounded (< 30 %) and for staying on one target
+  gEngage: true, // also fight mechs closing in on us (< 180 m) and wounded mechs (< 40 % HP, < 160 m)
+  finishR: 20, // close to this range on a wounded target (< 38 % HP) while we are > 42 % and at most 2 are near (0 = off)
+  fightCube: 70, // during a fight, grab cubes within this range (x0.57 under 50 % HP) (0 = off)
+  laserSeek: 240, // walk this far for a laser even with another second weapon (0 = off)
+  noMortar: true, // never pick up a mortar
+  gUp: true, // upgrade order: plating, armor, laser damage/charge, nanites, gun...
 }
+const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
+  "lightning_range", "servos", "gun_mag", "gun_velocity", "gyros", "lightning_chain", "reactor", "capacitor", "mortar_reload",
+  "mortar_splash", "mortar_velocity", "sensors", "jets", "laser_pierce"]
 
 type Enemy = {
   id: number
@@ -121,6 +138,14 @@ export class Brain {
   descendComp = -1
   tickStart = 0
   engagedNow: (Enemy & { d: number })[] = []
+  stickId = -1
+  stickT = -1e9
+  loseAt = -1e9
+  isoFlip = 0
+  /** Set each decision for iso fight movement: weapons ready to shoot (want line of sight) and finishing range. */
+  isoWant = 1
+  isoFinish = false
+  isoObs: Observation | null = null
   /** Milliseconds left for optional searches this decision (the hard limit is 50 ms). */
   private budget(): number {
     return P.tickBudgetMs - (now() - this.tickStart)
@@ -323,7 +348,7 @@ export class Brain {
       let pick = 0
       let bestRank = 1e9
       obs.offer.choices.forEach((c, i) => {
-        const r = P.upgrades.indexOf(c.id)
+        const r = (P.gUp ? G_UPGRADES : P.upgrades).indexOf(c.id)
         const rr = r < 0 ? 500 : r
         if (rr < bestRank) {
           bestRank = rr
@@ -350,8 +375,15 @@ export class Brain {
       mechs.push({ ...e, d, los })
     }
     // a threat is a mech that is after us; with P.selective, idle house bots are left alone
+    const late = obs.zone.next_radius <= 70 || obs.alive <= 3
+    const closingOf = (e: Enemy) => {
+      const dx = e.pos[0] - x, dy = e.pos[1] - y
+      const dl = Math.hypot(dx, dy)
+      return dl > 1 ? -((e.vel[0] - me.vel[0]) * dx + (e.vel[1] - me.vel[1]) * dy) / dl : 0
+    }
     const isThreat = (e: Enemy & { d: number }) =>
-      !P.selective || t - e.lastHurtUs < 12 || t - e.aimT < 3 || t - e.weHitT < 12 || e.d < P.threatNear
+      !P.selective || t - e.lastHurtUs < 12 || t - e.aimT < 3 || t - e.weHitT < 12 || e.d < P.threatNear ||
+      (P.gEngage && (late || (t - e.seen < 0.5 && ((closingOf(e) > 3 && e.d < 180) || (e.hp < 0.4 * e.maxHp && e.d < 160)))))
     const engaged = mechs.filter((e) => isThreat(e) && ((e.los && e.d < 220) || t - e.lastHurtUs < 4 || e.d < 50))
     const idle: (Enemy & { d: number; los: boolean })[] = []
     if (P.selective)
@@ -373,11 +405,23 @@ export class Brain {
       if (!e.los || e.d > maxDirect + 20 || !isThreat(e)) continue
       let s = e.d * 0.6 + e.hp * P.targetHpW
       if (t - e.lastHurtUs < 3) s -= 40
+      if (P.gTarget) {
+        if (e.d > 240) continue
+        s = e.d + 0.18 * e.hp
+        if (e.hp <= 0.3 * e.maxHp) s -= 200
+        if (e.id === this.stickId && t - this.stickT < 2) s -= 200
+        if (t - e.lastHurtUs < 4) s -= 40
+        if (closingOf(e) > 3) s -= 15
+      }
       if (s < bestScore) {
         bestScore = s
         const es = this.sizeOf(e.cubes)
         target = { id: e.id, kind: "mech", pos: e.pos, vel: e.vel, hp: e.hp, d: e.d, h: 9 * es, r: 2.5 * es }
       }
+    }
+    if (target && target.kind === "mech") {
+      this.stickId = target.id
+      this.stickT = t
     }
     const fighting = engaged.length > 0
     // footsteps, boosting or gunfire close by: someone is coming, stop looking at crates
@@ -431,6 +475,23 @@ export class Brain {
       } else if (finishing && hpFrac > 0.2) this.retreating = false
     }
     if (this.retreating && hpFrac >= P.recoverFrac) this.retreating = false
+    if (P.loseRule) {
+      // retreat only while we are losing, and stop 1.5 s after that ends
+      const nearN = mechs.filter((q) => t - q.seen < 0.15 && q.d < 160).length
+      let losing = (nearN >= 2 && hpFrac < 0.55) || (nearN >= 3 && hpFrac < 0.8)
+      const tid = target && target.kind === "mech" ? target.id : -1
+      const tgtE = mechs.find((q) => q.id === tid)
+      if (tgtE) {
+        const tf = tgtE.hp / Math.max(1, tgtE.maxHp)
+        if (hpFrac < 0.35 && tf > hpFrac + 0.1) losing = true
+        if (tf < 0.25 && hpFrac > 0.2 && nearN <= 2) losing = false
+      }
+      if (losing) this.loseAt = t
+      const fin = !!tgtE && tgtE.d < 120 && (tgtE.hp < 200 || tgtE.hp < me.hp * 0.5)
+      const was = this.retreating
+      this.retreating = t - this.loseAt < 1.5 && !fin && !late
+      if (this.retreating && !was) this.coverT = -1e9
+    }
 
     // ---- aim + fire
     let aimYaw = me.aim[0]
@@ -548,6 +609,7 @@ export class Brain {
       if ((this.badPickup.get(p.id) ?? 0) > t) continue
       if (have.has(p.kind)) continue
       if (Math.hypot(p.pos[0] - x, p.pos[1] - y) > reach - 0.3 || Math.abs(p.pos[2] - z) > 3.8) continue
+      if (P.noMortar && p.kind === "mortar") continue
       if (!slot1 && p.kind !== "gun") {
         act.take = p.id
         break
@@ -692,6 +754,23 @@ export class Brain {
       } else fightMove = true
       void band
     }
+    // mid-fight: walk over cubes that are close (kills drop the victim's cubes + 2)
+    if (fightMove && P.fightCube > 0 && !this.retreating) {
+      let r = P.fightCube * (hpFrac <= 0.5 ? 0.57 : 1)
+      let bc: Known | null = null
+      for (const c of this.cubes.values()) {
+        const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
+        if (d < r && Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) < 3) {
+          r = d
+          bc = c
+        }
+      }
+      if (bc) {
+        goal = [bc.pos[0], bc.pos[1]]
+        fightMove = false
+        this.mode = "fight-cube"
+      }
+    }
 
     // an idle bot has us in sight close by: get out of its view instead of provoking it
     if (P.selective && !goal && !fightMove && !roofBusy && !this.campRoof) {
@@ -728,6 +807,7 @@ export class Brain {
       let bs = Infinity
       for (const p of this.pickups.values()) {
         if ((this.badPickup.get(p.id) ?? 0) > t || have.has(p.kind as WeaponKind) || p.kind === "gun") continue
+        if (P.noMortar && p.kind === "mortar") continue
         const r = wantRank(p.kind!)
         if (slot1 && r <= curRank) continue
         const ground = this.map.surfAt(p.pos[0], p.pos[1])
@@ -736,7 +816,7 @@ export class Brain {
         const nn = this.map.nearestNode(p.pos[0], p.pos[1], 2, (k) => this.map.isMain(k))
         if (nn < 0 || (!this.map.isMain(n) && Math.hypot(this.map.nodeX(nn) - p.pos[0], this.map.nodeY(nn) - p.pos[1]) > 3)) continue
         const d = Math.hypot(p.pos[0] - x, p.pos[1] - y)
-        if (d > (slot1 ? 120 : 260)) continue
+        if (d > (!slot1 ? 260 : p.kind === "laser" && P.laserSeek > 0 ? P.laserSeek : 120)) continue
         if (!this.safe(obs, p.pos[0], p.pos[1], d / walk + 5, 5) || nearIdle(p.pos[0], p.pos[1])) continue
         const s = d - r * 25
         if (s < bs) {
@@ -814,8 +894,16 @@ export class Brain {
     if (fightMove && focus) {
       this.mode = this.retreating ? "retreat-fight" : "fight"
       this.engagedNow = engaged
+      if (P.iso) {
+        const ready = !!(laser || lightning) ||
+          (!!gun && (gun.w.ammo ?? 1) > 0 && (gun.w.reload ?? 0) <= 0.25 && focus.d <= gun.w.stats.range - 10)
+        this.isoWant = ready ? 1 : -1
+        const crowd = mechs.filter((q) => t - q.seen < 0.15 && (isThreat(q) || (q.los && q.d < 150))).length
+        this.isoFinish = focus.hp < 0.38 * focus.maxHp && hpFrac > 0.42 && crowd <= 2
+        this.isoObs = obs
+      }
       move = this.fightMove(me, focus, t)
-      boost = me.energy > 60 && !lightning
+      boost = P.iso ? !!lightning && focus.d > 50 && me.energy > 55 && this.isoWant > 0 : me.energy > 60 && !lightning
       // lightning shorts lasers and out-damages everything up close: rush in
       if (P.lightningPush && lightning && !this.retreating && focus.d > P.lightningBand[1] + 4 && focus.d < P.pushMaxD && me.energy > 22) boost = true
       // the gun only hits jinking targets reliably inside ~70 m: get there fast
@@ -958,6 +1046,7 @@ export class Brain {
     const band = this.band(me)
     const by = Math.atan2(e.pos[1] - y, e.pos[0] - x)
     const fx = Math.cos(by), fy = Math.sin(by)
+    if (P.iso && this.isoObs && !this.retreating) return this.isoMove(this.isoObs, me, e, t)
     if (P.kiteMulti) {
       // several hunters closing in: back away from their centre so they reach us one at a time
       const near = this.engagedNow.filter((q) => q.d < P.kiteR)
@@ -1020,6 +1109,96 @@ export class Brain {
     const m = norm2(fx * (radial || 0.5), fy * (radial || 0.5))
     if (this.walkOk(x, y, x + m[0] * 4, y + m[1] * 4)) return m
     return [0, 0]
+  }
+
+  /**
+   * Isolation fighting: score standing still and 16 spots 6 m away. A spot is good when it keeps our
+   * preferred range, keeps line of sight to the target (or breaks it while our gun reloads), and is
+   * hidden from every other mech we know about, so a squad has to reach us one at a time.
+   */
+  private isoMove(obs: Observation, me: SelfObs, e: Enemy & { d: number }, t: number): [number, number] {
+    const [x, y] = me.pos
+    const light = this.weapon(me, "lightning"), las = this.weapon(me, "laser")
+    let rp = P.gunR
+    if (light && me.energy > 12) rp = P.lightR
+    else if (las) rp = P.laserR
+    if (!light) {
+      if (e.weapons.includes("lightning")) rp = Math.max(rp, 64)
+      if (e.weapons.includes("mortar")) rp = Math.max(rp, 80)
+    }
+    if (this.isoFinish && P.finishR > 0) rp = P.finishR
+    const ed = Math.max(1e-6, Math.hypot(e.pos[0] - x, e.pos[1] - y))
+    const ux = (e.pos[0] - x) / ed, uy = (e.pos[1] - y) / ed
+    if (t >= this.isoFlip) {
+      if (this.rnd() < 0.6) this.strafeSign = -this.strafeSign
+      this.isoFlip = t + 0.3 + this.rnd() * 0.7
+    }
+    const sx = -uy * this.strafeSign, sy = ux * this.strafeSign
+    const tz = e.pos[2] + 4.5 * this.sizeOf(e.cubes)
+    const mh = me.stats.muzzle_height ?? 7
+    const body = 5.4 * this.sizeOf(me.cubes)
+    const others: Enemy[] = []
+    for (const o of this.enemies.values())
+      if (o.id !== e.id && t - o.seen < 2.5 && Math.hypot(o.pos[0] - x, o.pos[1] - y) < P.isoOthersR + 8) others.push(o)
+    others.sort((a, b) => Math.hypot(a.pos[0] - x, a.pos[1] - y) - Math.hypot(b.pos[0] - x, b.pos[1] - y))
+    if (this.budget() < 8 && others.length > 2) others.length = 2
+    let cube: Known | null = null
+    let cd = 40
+    for (const c of this.cubes.values()) {
+      const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
+      if (d < cd && Math.abs(c.pos[2] - me.pos[2]) < 4) {
+        cd = d
+        cube = c
+      }
+    }
+    const zn = obs.zone
+    const [lx, ly, lr] = this.zoneAt(obs, t)
+    const soon = clamp(1 - (zn.shrink_start - t) / 25, 0.1, 1)
+    let best = -Infinity, mx = 0, my = 0, blockedSide = false
+    for (let k = -1; k < 16; k++) {
+      let cx = x, cy = y, dx = 0, dy = 0, r = 0
+      if (k >= 0) {
+        const a = (k * Math.PI) / 8
+        r = 6
+        dx = Math.cos(a)
+        dy = Math.sin(a)
+        cx = x + dx * r
+        cy = y + dy * r
+        if (!this.walkOk(x, y, cx, cy)) {
+          if (dx * sx + dy * sy > 0.9) blockedSide = true
+          continue
+        }
+      }
+      const cz = k < 0 ? me.pos[2] : this.map.surfAt(cx, cy)
+      const d = Math.hypot(e.pos[0] - cx, e.pos[1] - cy)
+      let s = -1.1 * Math.abs(d - rp) - r * 0.4
+      const los = this.map.clear(cx, cy, cz + mh, e.pos[0], e.pos[1], tz, 1, 1.5)
+      if (los) s += P.isoLosW * this.isoWant
+      for (const o of others) {
+        if (Math.hypot(o.pos[0] - cx, o.pos[1] - cy) > P.isoOthersR) continue
+        if (this.map.clear(o.pos[0], o.pos[1], o.pos[2] + 8, cx, cy, cz + body, 1, 0.5)) s -= P.isoWatchW
+      }
+      const dz = Math.hypot(cx - lx, cy - ly) - lr
+      if (dz > -5) s -= 150 + 5 * (dz + 5)
+      const dn = Math.hypot(cx - zn.next_center[0], cy - zn.next_center[1]) - zn.next_radius
+      if (dn > -5) s -= soon * (25 + 0.8 * (dn + 5))
+      if (cube) s += 1.5 * (cd - Math.hypot(cube.pos[0] - cx, cube.pos[1] - cy))
+      if (this.isoWant > 0) s += 9 * (dx * sx + dy * sy)
+      if (k < 0) {
+        s -= 8
+        if (this.isoWant < 0 && !los) s += 14
+      }
+      if (s > best) {
+        best = s
+        mx = dx
+        my = dy
+      }
+    }
+    if (blockedSide) {
+      this.strafeSign = -this.strafeSign
+      this.isoFlip = t + 0.5
+    }
+    return [mx, my]
   }
 
   /** Sidestep for bullets on a collision course, mortar shells landing near, and lasers aimed at us. */
