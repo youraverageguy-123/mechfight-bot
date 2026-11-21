@@ -25,6 +25,7 @@ type Mech = {
   weapons: any[]; alive: boolean; active: boolean; lastDmg: number; lastSpend: number; cubes: number
   nav?: Navigator; strafe: number; flip: number; skill: number; act: any; seen: Map<number, number>
   events: any[]; diedAt: number; grounded: boolean
+  hitByUs: number; wgoal: number[] | null; wgoalT: number
 }
 
 function gunW() {
@@ -56,6 +57,14 @@ function zoneAt(z: any, t: number) {
 }
 
 let SR: () => number = Math.random
+// TIERS=1: every house bot is on the map from the start (visible, hittable). Hunters are activated
+// weakest first (ids 1-4 easy, 5-8 medium, 9-12 hard, 13-15 expert); the rest wander inside the zone.
+// NH=passive: idle bots fight back only once we hit them. NH=aggressive: they also shoot when they see us.
+const TIERS = process.env.TIERS === "1"
+const NH = process.env.NH ?? "passive"
+const TIER_SKILL = (process.env.SKILLS ?? "0.2,0.5,0.75,0.95").split(",").map(Number)
+const AIMN = Number(process.env.AIMN ?? 0.05)
+const present = (m: { active: boolean }) => TIERS || m.active
 function runMatch(seed: number, skill: number, give: string, nHunters: number, armed: boolean) {
   SR = makeRng(seed * 104729 + 7)
   const rnd = makeRng(seed * 7919 + 1)
@@ -72,7 +81,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const mechs: Mech[] = spawns.map((s, i) => ({
     id: i, pos: s.slice(), vel: [0, 0, 0], aim: [0, 0], cmdAim: [0, 0], hp: cfg.mech.hp, maxHp: cfg.mech.hp, energy: 100,
     weapons: [gunW(), null], alive: true, active: i === 0, lastDmg: -99, lastSpend: -99, cubes: 0,
-    strafe: 1, flip: 0, skill, act: {}, seen: new Map(), events: [], diedAt: Infinity, grounded: true,
+    strafe: 1, flip: 0, skill: TIERS && i > 0 ? TIER_SKILL[Math.min(3, Math.floor((i - 1) / 4))] : skill, act: {}, seen: new Map(), events: [],
+    diedAt: Infinity, grounded: true, hitByUs: -99, wgoal: null, wgoalT: 0,
   }))
   if (give !== "none") mechs[0].weapons[1] = { kind: give, cooldown: 0, charge: 0, stats: { ...cfg.weapons[give] } }
   for (let i = 1; i < mechs.length; i++) mechs[i].nav = new Navigator(map)
@@ -142,7 +152,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     vi.events.push({ type: "damaged", amount: amt, weapon, bearing: by ? bearing : null, by: by ? by.id : null, rear: !!rear })
     if (by) by.events.push({ type: "hit", target: vi.id, amount: amt, weapon })
     if (vi.id === 0) { dmgIn += amt; byW[weapon] = (byW[weapon] ?? 0) + Math.round(amt) }
-    if (by && by.id === 0) dmgOut += amt
+    if (by && by.id === 0) { dmgOut += amt; vi.hitByUs = t }
     if (vi.hp <= 0 && vi.alive) {
       vi.alive = false
       vi.diedAt = t
@@ -199,6 +209,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             } else m.events.push({ type: "take_failed", id: tk, reason: "range" })
           }
         } else if (m.active) m.act = hunterAct(m, me, t, zone)
+        else if (TIERS) m.act = idleAct(m, me, t, zone)
         else m.act = {}
       }
     }
@@ -307,7 +318,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             m.lastSpend = t
             let best: Mech | null = null, bd = Infinity
             for (const o of mechs) {
-              if (o === m || !o.alive || !o.active) continue
+              if (o === m || !o.alive || !present(o)) continue
+              if (m.id !== 0 && o.id !== 0) continue // house bots never hit each other
               const d = Math.hypot(o.pos[0] - m.pos[0], o.pos[1] - m.pos[1])
               const b = Math.atan2(o.pos[1] - m.pos[1], o.pos[0] - m.pos[0])
               if (d > w.stats.range || Math.abs(angDiff(b, m.aim[0])) > (w.stats.cone_deg * Math.PI) / 360) continue
@@ -330,7 +342,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             const o = [m.pos[0], m.pos[1], m.pos[2] + 7]
             let hitM: Mech | null = null, ht = Infinity
             for (const q of mechs) {
-              if (q === m || !q.alive || !q.active) continue
+              if (q === m || !q.alive || !present(q)) continue
+              if (m.id !== 0 && q.id !== 0) continue
               const tt = rayCyl(o, d, q.pos, 2.5, 9)
               if (tt !== null && tt < ht && tt < w.stats.range) { ht = tt; hitM = q }
             }
@@ -379,7 +392,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
         }
         if (dead) break
         for (const m of mechs) {
-          if (!m.alive || m.id === s.owner || !m.active) continue
+          if (!m.alive || m.id === s.owner || !present(m)) continue
+          if (s.owner !== 0 && m.id !== 0) continue
           if (Math.hypot(s.pos[0] - m.pos[0], s.pos[1] - m.pos[1]) < 2.5 + 0.3 && s.pos[2] > m.pos[2] && s.pos[2] < m.pos[2] + 9) {
             hits[s.owner === 0 ? 0 : 1]++
             damage(m, s.dmg, mechs[s.owner], "gun", s.pos[0] - s.vel[0] * 0.05, s.pos[1] - s.vel[1] * 0.05, t)
@@ -496,8 +510,9 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
     act.move = [-Math.sin(b) * m.strafe + Math.cos(b) * rad, Math.cos(b) * m.strafe + Math.sin(b) * rad]
     const v = [me.vel[0] * m.skill, me.vel[1] * m.skill, 0]
     const sol = leadStraight(x, y, m.pos[2] + 7, me.pos[0], me.pos[1], me.pos[2] + 4.5, v[0], v[1], 0, 252, 3, me.pos[2] + 2, 22)
-    act.aim = [sol.yaw + (SR() - 0.5) * 0.02 * (1 - m.skill), sol.pitch]
-    const err = Math.abs(angDiff(m.aim[0], sol.yaw))
+    const nz = TIERS ? gauss(SR) * AIMN * (1 - m.skill) : (SR() - 0.5) * 0.02 * (1 - m.skill)
+    act.aim = [sol.yaw + nz, sol.pitch]
+    const err = Math.abs(angDiff(m.aim[0], sol.yaw + nz))
     act.fire = [err < 0.05, false]
     const w1 = m.weapons[1]
     if (w1 && w1.kind === "lightning") {
@@ -506,8 +521,9 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
     } else if (w1 && w1.kind === "laser") {
       const full = w1.charge >= w1.stats.charge
       const yawTo = Math.atan2(me.pos[1] - y, me.pos[0] - x)
-      act.aim = [yawTo, Math.atan2(me.pos[2] + 4.5 - m.pos[2] - 7, d)]
-      const e2 = Math.abs(angDiff(m.aim[0], yawTo))
+      const lz = TIERS ? nz : 0
+      act.aim = [yawTo + lz, Math.atan2(me.pos[2] + 4.5 - m.pos[2] - 7, d)]
+      const e2 = Math.abs(angDiff(m.aim[0], yawTo + lz))
       act.fire[1] = w1.cooldown <= 0 && !(full && e2 < Math.atan2(2, d) * (0.5 + m.skill))
     }
   } else {
@@ -531,6 +547,43 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
   return act
 }
 
+/** A house bot that is not hunting yet: wanders inside the zone; fights back once we hit it
+ * (and with NH=aggressive, shoots whenever it sees us, without chasing). */
+function idleAct(m: Mech, me: Mech, t: number, zone: any) {
+  const [x, y] = m.pos
+  const d = Math.hypot(me.pos[0] - x, me.pos[1] - y)
+  const hostile = NH !== "none" && t - m.hitByUs < 20
+  if (hostile || NH === "aggressive") {
+    const los = d < 160 && map.clear(x, y, m.pos[2] + 8, me.pos[0], me.pos[1], me.pos[2] + 4.5, 1, 1)
+    // defend: shoot back while in sight, never chase
+    if (los || (hostile && NH === "passive")) return hunterAct(m, me, t, zone)
+  }
+  const [zx, zy, zr] = zoneAt(zone, t + 20)
+  if (!m.wgoal || Math.hypot(m.wgoal[0] - x, m.wgoal[1] - y) < 6 || t > m.wgoalT) {
+    for (let k = 0; k < 20; k++) {
+      const a = SR() * Math.PI * 2, r = 20 + SR() * 60
+      let gx = x + Math.cos(a) * r, gy = y + Math.sin(a) * r
+      if (Math.hypot(gx - zx, gy - zy) > zr * 0.7) {
+        gx = x + (zx - x) * 0.35
+        gy = y + (zy - y) * 0.35
+      }
+      const n = map.nodeOf(gx, gy)
+      if (map.isMain(n)) {
+        m.wgoal = [map.nodeX(n), map.nodeY(n)]
+        break
+      }
+    }
+    m.wgoalT = t + 20
+  }
+  const act: any = {}
+  if (m.wgoal) {
+    m.nav!.setGoal(m.wgoal[0], m.wgoal[1], t, x, y)
+    act.move = m.nav!.steer(x, y)
+    act.aim = [Math.atan2(act.move[1], act.move[0]) || m.aim[0], 0]
+  }
+  return act
+}
+
 function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, tick: number, items: Item[], world: any) {
   const pk: any[] = [], cr: any[] = []
   for (const it of items) {
@@ -544,7 +597,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
   }
   const vis: any[] = []
   for (const o of mechs) {
-    if (o === m || !o.alive || !o.active) continue
+    if (o === m || !o.alive || !present(o)) continue
     const d = Math.hypot(o.pos[0] - m.pos[0], o.pos[1] - m.pos[1])
     const b = Math.atan2(o.pos[1] - m.pos[1], o.pos[0] - m.pos[0])
     const inFov = d < cfg.vision.range && Math.abs(angDiff(b, m.aim[0])) < (cfg.vision.fov_deg * Math.PI) / 360
@@ -556,7 +609,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
   const projectiles = shots.filter((s) => s.owner !== m.id && Math.hypot(s.pos[0] - m.pos[0], s.pos[1] - m.pos[1]) < 200).map((s, i) => ({ id: i, kind: "gun", pos: s.pos.slice(), vel: s.vel.slice() }))
   const sounds: any[] = []
   for (const o of mechs) {
-    if (o === m || !o.alive || !o.active) continue
+    if (o === m || !o.alive || !present(o)) continue
     const d = Math.hypot(o.pos[0] - m.pos[0], o.pos[1] - m.pos[1])
     const sp = Math.hypot(o.vel[0], o.vel[1])
     const kind = sp > 15 ? "boost" : sp > 5 ? "step" : null

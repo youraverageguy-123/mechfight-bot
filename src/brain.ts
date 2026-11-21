@@ -42,6 +42,11 @@ export const P = {
     "gyros", "mortar_reload", "lightning_range", "lightning_chain", "gun_mag", "gun_velocity", "sensors", "servos", "capacitor",
     "reactor", "jets", "mortar_splash", "mortar_velocity", "laser_pierce"],
   dropMinDist: 70, // no enemy this close to a drop
+  // Practice house bots hunt us weakest first; the others are idle. Only fight mechs that are after
+  // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
+  selective: true,
+  threatNear: 35, // anything closer than this counts as a threat
+  avoidR: 90, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
 }
 
@@ -57,6 +62,9 @@ type Enemy = {
   charging: boolean
   seen: number
   lastHurtUs: number
+  aimCnt: number
+  aimT: number
+  weHitT: number
 }
 
 type Known = { id: number; kind?: string; pos: [number, number, number]; seen: number; hp?: number }
@@ -138,9 +146,15 @@ export class Brain {
   // ------------------------------------------------------------------ memory
   private remember(obs: Observation) {
     const t = obs.t
+    const [sx, sy] = obs.self.pos
     for (const m of obs.mechs) {
       if (m.kind !== "mech") continue
       const e = this.enemies.get(m.id)
+      const dd = Math.hypot(m.pos[0] - sx, m.pos[1] - sy)
+      const aimAt = dd < 280 && Math.abs(angDiff(m.aim[0], Math.atan2(sy - m.pos[1], sx - m.pos[0]))) < Math.atan2(7, dd) + 0.04
+      const aimCnt = aimAt ? Math.min(10, (e?.aimCnt ?? 0) + 1) : Math.max(0, (e?.aimCnt ?? 0) - 1)
+      let aimT = e?.aimT ?? -1e9
+      if (aimCnt >= 3 || (aimAt && m.charging)) aimT = t
       const ne: Enemy = {
         id: m.id,
         pos: [m.pos[0], m.pos[1], m.pos[2]],
@@ -153,6 +167,9 @@ export class Brain {
         charging: !!m.charging,
         seen: t,
         lastHurtUs: e?.lastHurtUs ?? -1e9,
+        aimCnt,
+        aimT,
+        weHitT: e?.weHitT ?? -1e9,
       }
       this.enemies.set(m.id, ne)
     }
@@ -185,7 +202,11 @@ export class Brain {
             if (e) e.lastHurtUs = t
           }
         }
-      } else if (ev.type === "hit") this.lastDealt = t
+      } else if (ev.type === "hit") {
+        this.lastDealt = t
+        const e = this.enemies.get(ev.target)
+        if (e) e.weHitT = t
+      }
       else if (ev.type === "effect" && ev.effect === "short") this.shortUntil = t + (this.cfg.weapons.lightning.short_s ?? 2)
       else if (ev.type === "take_failed") this.badPickup.set(ev.id, t + 4)
       else if (ev.type === "took") this.pickups.delete(ev.id)
@@ -318,14 +339,28 @@ export class Brain {
       const los = t - e.seen < 0.15 && d < 260 && this.map.clear(x, y, muzzleZ, e.pos[0], e.pos[1], ez, 3, 2)
       mechs.push({ ...e, d, los })
     }
-    const engaged = mechs.filter((e) => (e.los && e.d < 220) || t - e.lastHurtUs < 4 || e.d < 50)
+    // a threat is a mech that is after us; with P.selective, idle house bots are left alone
+    const isThreat = (e: Enemy & { d: number }) =>
+      !P.selective || t - e.lastHurtUs < 12 || t - e.aimT < 3 || t - e.weHitT < 12 || e.d < P.threatNear
+    const engaged = mechs.filter((e) => isThreat(e) && ((e.los && e.d < 220) || t - e.lastHurtUs < 4 || e.d < 50))
+    const idle: (Enemy & { d: number; los: boolean })[] = []
+    if (P.selective)
+      for (const e of this.enemies.values()) {
+        if (t - e.seen > 20) continue
+        const d = Math.hypot(e.pos[0] - x, e.pos[1] - y)
+        const me2 = mechs.find((q) => q.id === e.id)
+        if (me2 ? !isThreat(me2) : !isThreat({ ...e, d })) idle.push(me2 ?? { ...e, d, los: false })
+      }
+    /** Would going to (px,py) take us near an idle bot? */
+    const nearIdle = (px: number, py: number) =>
+      idle.some((e) => Math.hypot(e.pos[0] - px, e.pos[1] - py) < P.avoidR && Math.hypot(px - x, py - y) > 12)
     const recentHurt = t - this.lastHurt < 3
 
     // ---- choose a target
     let target: Target | null = null
     let bestScore = Infinity
     for (const e of mechs) {
-      if (!e.los || e.d > maxDirect + 20) continue
+      if (!e.los || e.d > maxDirect + 20 || !isThreat(e)) continue
       let s = e.d * 0.6 + e.hp * 0.06
       if (t - e.lastHurtUs < 3) s -= 40
       if (s < bestScore) {
@@ -446,7 +481,7 @@ export class Brain {
     if (mortar && mortar.w.cooldown <= 0.3) {
       let mt: (Enemy & { d: number; los: boolean }) | null = null
       for (const e of mechs) {
-        if (e.d < 28 || e.d > 230 || t - e.seen > 4) continue
+        if (e.d < 28 || e.d > 230 || t - e.seen > 4 || !isThreat(e)) continue
         if (e.los && gun && (gun.w.ammo ?? 0) > 0 && e.d < gunRange) continue
         if (!mt || e.d < mt.d) mt = e
       }
@@ -648,13 +683,25 @@ export class Brain {
       void band
     }
 
+    // an idle bot has us in sight close by: get out of its view instead of provoking it
+    if (P.selective && !goal && !fightMove && !roofBusy && !this.campRoof) {
+      const watcher = idle.filter((e) => e.los && e.d < P.avoidR && t - e.seen < 0.5)
+      if (watcher.length > 0) {
+        if (t - this.coverT > 1.5 || Number.isNaN(this.coverX)) this.pickCover(obs, watcher)
+        if (!Number.isNaN(this.coverX)) {
+          goal = [this.coverX, this.coverY]
+          this.mode = "avoid"
+        }
+      }
+    }
+
     // cubes nearby
     if (!goal && !fightMove && !roofBusy) {
       let best: Known | null = null
       let bd = fighting ? (engaged.some((e) => e.los) ? P.cubeFightRange : Math.max(P.cubeFightRange, 40)) : P.cubeRange
       for (const c of this.cubes.values()) {
         const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
-        if (d < bd && Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) < 3 && this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 5)) {
+        if (d < bd && Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) < 3 && this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 5) && !nearIdle(c.pos[0], c.pos[1])) {
           bd = d
           best = c
         }
@@ -680,7 +727,7 @@ export class Brain {
         if (nn < 0 || (!this.map.isMain(n) && Math.hypot(this.map.nodeX(nn) - p.pos[0], this.map.nodeY(nn) - p.pos[1]) > 3)) continue
         const d = Math.hypot(p.pos[0] - x, p.pos[1] - y)
         if (d > (slot1 ? 120 : 260)) continue
-        if (!this.safe(obs, p.pos[0], p.pos[1], d / walk + 5, 5)) continue
+        if (!this.safe(obs, p.pos[0], p.pos[1], d / walk + 5, 5) || nearIdle(p.pos[0], p.pos[1])) continue
         const s = d - r * 25
         if (s < bs) {
           bs = s
@@ -701,7 +748,7 @@ export class Brain {
       const consider = (c: Known, value: number, drone: boolean) => {
         const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
         if (d > P.farmRange || Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) > 3) return
-        if (!this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 8)) return
+        if (!this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 8) || nearIdle(c.pos[0], c.pos[1])) return
         const s = d - value
         if (s < bs) {
           bs = s
@@ -722,7 +769,7 @@ export class Brain {
     this.markVisited(x, y, t)
     if (!goal && !fightMove && !fighting && !target && !slot1 && hpFrac > 0.4 && t < P.exploreUntil && !roofBusy) {
       const reached = Math.hypot(this.expX - x, this.expY - y) < 12
-      if (Number.isNaN(this.expX) || reached || t - this.expT > 30 || !this.safe(obs, this.expX, this.expY, 25, 15)) this.pickExplore(obs)
+      if (Number.isNaN(this.expX) || reached || t - this.expT > 30 || !this.safe(obs, this.expX, this.expY, 25, 15) || nearIdle(this.expX, this.expY)) this.pickExplore(obs)
       if (!Number.isNaN(this.expX)) {
         goal = [this.expX, this.expY]
         this.mode = "explore"
