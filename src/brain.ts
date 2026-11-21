@@ -69,6 +69,9 @@ export class Brain {
   strafeFlip = 0
   shortUntil = -1
   scanYaw = 0
+  escX = NaN
+  escY = NaN
+  escT = -1e9
   lastT = 0
   mode = "start"
   tickMs: number[] = []
@@ -488,7 +491,7 @@ export class Brain {
 
     // supply drop
     if (!goal && !this.retreating) {
-      for (const dr of obs.drops) {
+      for (const dr of obs.drops ?? []) {
         if (dr.holder != null && dr.holder !== this.myId) continue
         const d = Math.hypot(dr.pos[0] - x, dr.pos[1] - y)
         if (d / walk > dr.lands_in + 12) continue
@@ -621,11 +624,27 @@ export class Brain {
       if (me.grounded && this.nav.stuckCount % 2 === 0) jump = true
       if (!me.grounded && me.energy > 10) boost = true
     }
-    // stranded off the nav graph (e.g. inside the stadium bowl or on a roof edge): jet toward the goal
-    const myNode = this.map.nodeOf(x, y)
-    if (goal && !this.map.navOk[myNode] && this.nav.path.length === 0 && commanded) {
-      if (me.grounded && this.rnd() < 0.3) jump = true
-      if (!me.grounded && me.energy > 10) boost = true
+    // stranded off the main nav graph (stadium bowl, a roof, a pit): head for the nearest main
+    // node, jumping and jetting over whatever is in the way
+    const isMain = (n: number) => this.map.isMain(n)
+    const onMain = this.map.nearestNode(x, y, 1, isMain) >= 0
+    if (!onMain && !fightMove && (!goal || this.nav.partial || this.nav.path.length === 0)) {
+      if (t - this.escT > 1 || Number.isNaN(this.escX)) {
+        const n = this.map.nearestNode(x, y, 70, isMain)
+        this.escT = t
+        if (n >= 0) {
+          this.escX = this.map.nodeX(n)
+          this.escY = this.map.nodeY(n)
+        }
+      }
+      if (!Number.isNaN(this.escX)) {
+        const [ex, ey] = norm2(this.escX - x, this.escY - y)
+        move = [ex, ey]
+        const sp = Math.hypot(me.vel[0], me.vel[1])
+        this.mode = "escape"
+        if (me.grounded && sp < 3) jump = true
+        if (!me.grounded && me.energy > 3 && me.vel[2] < 9) boost = true
+      }
     }
 
     act.move = [move[0], move[1]]
