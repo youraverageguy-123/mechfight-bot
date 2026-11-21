@@ -15,7 +15,8 @@ export const P = {
   farmUntil: 230, // farm crates / drones before this match time
   farmMinHp: 0.55,
   exploreUntil: 240, // look for a second weapon until this match time
-  multiRetreatFrac: 0.45, // retreat below this when 2+ enemies are on us
+  multiRetreatFrac: 0.45,
+  kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
   gunBand: [35, 120] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
@@ -286,7 +287,9 @@ export class Brain {
       }
     }
     const fighting = engaged.length > 0
-    const farmOk = !fighting && hpFrac >= P.farmMinHp && !recentHurt
+    // footsteps, boosting or gunfire close by: someone is coming, stop looking at crates
+    const heardThreat = this.sounds.some((s) => t - s.t < 2 && s.dist !== "far" && s.kind !== "explosion")
+    const farmOk = !fighting && hpFrac >= P.farmMinHp && !recentHurt && !heardThreat
     if (!target) {
       // drones that are shooting us, or farmable ones
       for (const m of obs.mechs) {
@@ -617,6 +620,8 @@ export class Brain {
       this.mode = this.retreating ? "retreat-fight" : "fight"
       move = this.fightMove(me, focus, t)
       boost = me.energy > 60 && !lightning
+      // kite lightning carriers we can't match up close
+      if (P.kite && !lightning && focus.weapons.includes("lightning") && focus.d < 60 && me.energy > 8) boost = true
     } else if (fighting && goal && focus && this.mode !== "zone") {
       // moving with enemies around: blend in a bit of strafe
       const by = Math.atan2(focus.pos[1] - y, focus.pos[0] - x)

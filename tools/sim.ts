@@ -148,6 +148,10 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
           const t0 = performance.now()
           m.act = brain.act(obs)
           modes[brain.mode] = (modes[brain.mode] ?? 0) + 1
+          if (process.env.TRACE && tick % 10 === 0) {
+            const en = mechs.filter((q) => q.id > 0 && q.alive && q.active).map((q) => `${q.id}:${q.weapons[1]?.kind?.[0] ?? "g"}:${Math.round(Math.hypot(q.pos[0] - m.pos[0], q.pos[1] - m.pos[1]))}m:${Math.round(q.hp)}`).join(" ")
+            console.log(`t${t.toFixed(0)} ${brain.mode} hp${Math.round(m.hp)} w:${m.weapons[1]?.kind ?? "-"} fire:${JSON.stringify(m.act.fire)} | ${en}`)
+          }
           const ms = performance.now() - t0
           tms.push(ms)
           if (ms > maxMs) maxMs = ms
@@ -429,6 +433,17 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
       vis.push({ id: o.id, kind: "mech", pos: o.pos.slice(), vel: o.vel.slice(), aim: o.aim.slice(), hp: o.hp, max_hp: o.maxHp, cubes: o.cubes, weapons: o.weapons.filter((w) => w).map((w) => w.kind), charging: o.weapons.some((w) => w && w.kind === "laser" && w.charge > 0) })
   }
   const projectiles = shots.filter((s) => s.owner !== m.id && Math.hypot(s.pos[0] - m.pos[0], s.pos[1] - m.pos[1]) < 200).map((s, i) => ({ id: i, kind: "gun", pos: s.pos.slice(), vel: s.vel.slice() }))
+  const sounds: any[] = []
+  for (const o of mechs) {
+    if (o === m || !o.alive || !o.active) continue
+    const d = Math.hypot(o.pos[0] - m.pos[0], o.pos[1] - m.pos[1])
+    const sp = Math.hypot(o.vel[0], o.vel[1])
+    const kind = sp > 15 ? "boost" : sp > 5 ? "step" : null
+    if (!kind || tick % 12 !== 0) continue
+    if (d > cfg.sound.range[kind]) continue
+    const b = Math.atan2(o.pos[1] - m.pos[1], o.pos[0] - m.pos[0]) + (Math.random() - 0.5) * 0.2
+    sounds.push({ kind, bearing: b, dist: d < 60 ? "near" : d < 160 ? "mid" : "far", age: 0.05 })
+  }
   const [zx, zy, zr] = zoneAt(zone, t)
   return {
     type: "obs", tick, t, alive: mechs.filter((q) => q.alive).length + (16 - mechs.length),
@@ -437,7 +452,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
       grounded: true, cubes: m.cubes, upgrades: [], weapons: m.weapons.map((w) => (w ? { ...w } : null)), in_zone: Math.hypot(m.pos[0] - zx, m.pos[1] - zy) <= zr,
       stats: { ...cfg.mech },
     },
-    mechs: vis, projectiles, crates: cr, cubes: [], pickups: pk, sounds: [], beams: [], events: m.events.slice(), drops: [], zone, offer: null,
+    mechs: vis, projectiles, crates: cr, cubes: [], pickups: pk, sounds, beams: [], events: m.events.slice(), drops: [], zone, offer: null,
   } as any
 }
 
