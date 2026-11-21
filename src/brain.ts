@@ -17,7 +17,7 @@ export const P = {
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
-  holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
+  holdCoverW: 3, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   peek: true, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
