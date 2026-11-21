@@ -54,7 +54,7 @@ export const P = {
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
   threatNear: 60, // anything closer than this counts as a threat
-  avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
+  avoidR: 0, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
   salt: 0, // mixed into our RNG seed: same strategy, different random choices
   // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
