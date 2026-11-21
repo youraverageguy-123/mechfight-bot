@@ -24,6 +24,14 @@ Finding (track rules): the 15 house bots are 4 easy / 4 medium / 4 hard / 3 expe
 weakest first; the rest stay idle on the map. Our bot shot at and chased every mech in sight, so it
 woke up stronger idle bots. Sim rebuilt with the full tiered roster (TIERS=1).
 
-| 11 | b9bfc9a (main) | selective: fight only mechs that are after us, keep away from idle bots | pending |
-| 12 | 54e454e (exp-j-evasive) | selective + avoid idle bots within 140 m + no chasing | pending |
+| 11 | b9bfc9a (main) | selective: fight only mechs that are after us, keep away from idle bots | **4.94** |
+| 12 | 54e454e (exp-j-evasive) | selective + avoid idle bots within 140 m + no chasing | 4.42 |
 | 13 | 62c243b (exp-k-noavoid) | selective targeting only, no avoidance | pending |
+
+Real evidence so far: every less aggressive variant lost points (no chase 4.35-4.52, evasive 4.42).
+Map has almost no enclosed spots (30 of 32k have all sightlines < 60 m), so no closet ambush.
+A roof lies in the final r25 circle in ~48% of zone draws (~25% within 8 m of the last point).
+
+| 14 | 0292805 (exp-l-roof) | selective + rooftop camping from 45 s (do house bots climb?) | pending |
+| 15 | 5debac2 (exp-m-aggro) | selective + chase to 250 m, boost in, gun band 30-90 m, contest drops | pending |
+| 16 | 32ebfdb (exp-n-roof150) | selective + rooftop camping from 150 s | pending |
