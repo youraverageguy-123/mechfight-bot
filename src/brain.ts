@@ -26,7 +26,7 @@ export const P = {
   huntMinHp: 0.55, // ...while above this HP fraction
   closeBoost: false, // boost while closing in on a target beyond our range band
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
-  roof: false, // camp on rooftops (sim: survives longer but kills less, so off)
+  roof: true, // camp on rooftops (sim: survives longer but kills less, so off)
   roofFrom: 45, // earliest match time to head for a roof
   roofWeaponGrace: 60, // ...or this much later even with only the gun
   roofMaxTravel: 320, // don't walk further than this to reach a roof
