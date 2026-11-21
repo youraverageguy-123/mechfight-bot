@@ -22,9 +22,9 @@ export const P = {
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
-  huntRange: 160, // ...up to this far
-  huntMinHp: 0.55, // ...while above this HP fraction
-  closeBoost: false, // boost while closing in on a target beyond our range band
+  huntRange: 250, // ...up to this far
+  huntMinHp: 0.45, // ...while above this HP fraction
+  closeBoost: true, // boost while closing in on a target beyond our range band
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   roof: false, // camp on rooftops (sim: survives longer but kills less, so off)
   roofFrom: 45, // earliest match time to head for a roof
@@ -37,13 +37,13 @@ export const P = {
   lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
   pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
-  gunBand: [35, 120] as [number, number],
+  gunBand: [30, 90] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
   upgrades: ["armor", "plating", "nanites", "gun_rate", "gun_damage", "lightning_efficiency", "laser_damage", "laser_charge",
     "gyros", "mortar_reload", "lightning_range", "lightning_chain", "gun_mag", "gun_velocity", "sensors", "servos", "capacitor",
     "reactor", "jets", "mortar_splash", "mortar_velocity", "laser_pierce"],
-  dropMinDist: 70, // no enemy this close to a drop
+  dropMinDist: 35, // no enemy this close to a drop
   // Practice house bots hunt us weakest first; the others are idle. Only fight mechs that are after
   // us (hurt us, track us with their aim, or got hit by us) and keep away from the idle ones.
   selective: true,
