@@ -16,6 +16,8 @@ export const P = {
   farmMinHp: 0.55,
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
+  hunt: true, // chase enemies we lost sight of
+  holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
   gunBand: [35, 120] as [number, number],
   lightningBand: [14, 32] as [number, number],
@@ -521,7 +523,7 @@ export class Brain {
     if (!goal && fighting && focus) {
       const band = this.band(me)
       if (focus.los) fightMove = true
-      else if (!this.retreating && hpFrac > 0.55 && t - focus.seen < 5 && focus.d < 160) {
+      else if (P.hunt && !this.retreating && hpFrac > 0.55 && t - focus.seen < 5 && focus.d < 160) {
         goal = [focus.pos[0], focus.pos[1]]
         this.mode = "hunt"
       } else fightMove = true
@@ -905,7 +907,7 @@ export class Brain {
       const nx = m.nodeX(n), ny = m.nodeY(n)
       const dc = Math.hypot(nx - cx, ny - cy)
       if (dc > lim) continue
-      const s = Math.hypot(nx - x, ny - y) * 0.6 + dc * 0.25 - Math.min(m.cover[n], 60) * 1.2
+      const s = Math.hypot(nx - x, ny - y) * 0.6 + dc * 0.25 - Math.min(m.cover[n], 60) * P.holdCoverW
       if (s < bs) {
         bs = s
         best = n
@@ -915,7 +917,7 @@ export class Brain {
       // keep the old hold point unless the new one is clearly better
       if (!Number.isNaN(this.holdX) && this.safe(obs, this.holdX, this.holdY, 20, 6)) {
         const on = m.nodeOf(this.holdX, this.holdY)
-        const os = Math.hypot(this.holdX - x, this.holdY - y) * 0.6 + Math.hypot(this.holdX - cx, this.holdY - cy) * 0.25 - Math.min(m.cover[on], 60) * 1.2
+        const os = Math.hypot(this.holdX - x, this.holdY - y) * 0.6 + Math.hypot(this.holdX - cx, this.holdY - cy) * 0.25 - Math.min(m.cover[on], 60) * P.holdCoverW
         if (os <= bs + 10) return
       }
       this.holdX = m.nodeX(best)
