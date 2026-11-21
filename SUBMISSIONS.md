@@ -46,9 +46,26 @@ Sweep (25 single changes) -> mostly noise. Kiting away from 2+ converging hunter
 gain: +0.77 / +1.23 / +0.71 (three house-bot models, 192 paired seeds). Silent creeping -1.0,
 lightning-first -0.86, rooftops -0.5..-1.1.
 
-| 17 | 4fecc6b (exp-o-combo) | sweep combo: avoid 60 m, multi-retreat 0.65, no drone/weapon detours, damage upgrades, gun 60-160 | pending |
-| 18 | b7ab306 (exp-p-avoid40) | selective, avoid idle bots within 40 m | pending |
-| 19 | 90d734b (main) | kite away from converging hunters (200 m) + avoid idle bots 60 m | pending |
-| 20 | 732b8ba (exp-q-kite-s1) | same as 19, RNG salt 1 (second draw) | pending |
-| 21 | a2bde0a (exp-r-kite-s2) | same as 19, RNG salt 2 (third draw) | pending |
-| 22 | ff4e37e (exp-s-kite-band) | 19 + gun band 60-160 m | pending |
+| 19 | 90d734b (main) | kite away from converging hunters (200 m) + avoid idle bots 60 m | 4.81 (BB-2FD053E1) |
+| 20 | 732b8ba (exp-q-kite-s1) | same as 19, RNG salt 1 (second draw) | 4.52 (BB-E6D2B1F7) |
+| 21 | a2bde0a (exp-r-kite-s2) | same as 19, RNG salt 2 (third draw) | 4.71 (BB-E3377CEE) |
+| 22 | ff4e37e (exp-s-kite-band) | 19 + gun band 60-160 m | 4.69 (BB-A2DA0247) |
+
+Kiting lost in reality (mean 4.68 over 4 runs vs 4.94 / 4.92 without it): the sim overrated it.
+Spread of the three same-strategy salt draws: 4.52-4.81 (sd ~0.15), so one real run separates
+versions ~0.4 apart. exp-o / exp-p were never submitted.
+
+Research round 2 (public repos, read-only): other teams plateau at 4.5-4.9 too (LanceHuang245:
+4.75 / 4.88 / 4.69; their notes: identical code rescored identically, survivability dominates).
+Board #3 giddygiddyboy (6.19) published an MIT bot. Its practice mode: fight movement that picks
+spots keeping line of sight to the target while hidden from every other mech; retreat only while
+losing; target the wounded and stick to them; finish at 20 m; grab cubes mid-fight; seek lasers.
+Reimplemented those ideas in our own code (iso / loseRule / gTarget / gEngage / finishR /
+fightCube / laserSeek / noMortar / gUp switches).
+
+| 23 | ee50061 (main) | iso fighting + lose-rule retreat + finisher targeting + fight cubes + laser seek, no kiting | pending |
+| 24 | 38f971e (exp-t-iso-nohunt) | 23 without chasing hidden enemies | pending |
+| 25 | 0405f87 (exp-u-iso-s1) | 23, RNG salt 1 | pending |
+| 26 | 39c6d7b (exp-v-noiso) | 23 without iso movement (old strafe) | pending |
+| 27 | 54ff748 (exp-w-iso-oldretreat) | 23 with the old HP-threshold retreat | pending |
+| 28 | 41594f4 (exp-x-iso-noavoid) | 23 without avoiding idle bots | pending |
