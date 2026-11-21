@@ -16,7 +16,7 @@ export const P = {
   farmMinHp: 0.55,
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
-  hunt: true, // chase enemies we lost sight of
+  hunt: false, // chase enemies we lost sight of
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
   gunBand: [35, 120] as [number, number],
