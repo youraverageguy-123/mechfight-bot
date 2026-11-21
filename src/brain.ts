@@ -4,6 +4,7 @@ import { draw } from "../mechfight.ts"
 import { leadMortar, leadStraight, type AimSol } from "./aim.ts"
 import type { GameMap } from "./map.ts"
 import { Navigator } from "./nav.ts"
+import { type Climb, type Roof, RoofIndex } from "./roof.ts"
 import { angDiff, clamp, makeRng, norm2, now, TAU, wrapAngle } from "./util.ts"
 
 // ---- tunables (A/B test these) ----
@@ -14,10 +15,22 @@ export const P = {
   lightningReserve: 12, // energy kept back
   farmUntil: 230, // farm crates / drones before this match time
   farmMinHp: 0.55,
+  farmRange: 250, // walk this far for crates / drones
+  droneValue: 250, // metres of detour a drone (2 cubes) is worth over a crate; 0 = don't seek drones
+  cubeRange: 160, // walk this far for cubes when no enemy is in sight
+  cubeFightRange: 30, // ...and this far while enemies are around
   exploreUntil: 240, // look for a second weapon until this match time
   multiRetreatFrac: 0.45,
   hunt: true, // chase enemies we lost sight of
+  huntRange: 160, // ...up to this far
+  huntMinHp: 0.55, // ...while above this HP fraction
+  closeBoost: false, // boost while closing in on a target beyond our range band
   holdCoverW: 1.2, // hold-spot preference: + = next to buildings, - = open ground with long sightlines
+  roof: false, // camp on rooftops (sim: survives longer but kills less, so off)
+  roofFrom: 45, // earliest match time to head for a roof
+  roofWeaponGrace: 60, // ...or this much later even with only the gun
+  roofMaxTravel: 320, // don't walk further than this to reach a roof
+  tickBudgetMs: 22, // optional searches stop once a decision has used this much time
   peek: true, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
@@ -60,6 +73,7 @@ export class Brain {
   enemies = new Map<number, Enemy>()
   pickups = new Map<number, Known>()
   crates = new Map<number, Known>()
+  drones = new Map<number, Known>()
   cubes = new Map<number, Known>()
   badPickup = new Map<number, number>()
   lastHurt = -1e9
@@ -78,6 +92,21 @@ export class Brain {
   shortUntil = -1
   scanYaw = 0
   missD: number[] = []
+  roofs: RoofIndex
+  roof: Roof | null = null
+  roofPickT = -1e9
+  climb: Climb | null = null
+  climbing = false
+  climbStart = 0
+  badClimbs = new Set<string>()
+  /** Roof we are camping on right now (movement must stay on it), or null. */
+  campRoof: Roof | null = null
+  descendComp = -1
+  tickStart = 0
+  /** Milliseconds left for optional searches this decision (the hard limit is 50 ms). */
+  private budget(): number {
+    return P.tickBudgetMs - (now() - this.tickStart)
+  }
   stats = { duckSeen: 0, duckFound: 0, charging: 0 }
   peekX = NaN
   peekY = NaN
@@ -101,6 +130,7 @@ export class Brain {
     this.cfg = hello.config
     this.map = map
     this.nav = new Navigator(map)
+    this.roofs = new RoofIndex(map)
     this.rnd = makeRng(hello.seed)
     this.myId = hello.slot
   }
@@ -131,6 +161,7 @@ export class Brain {
       for (const it of list) map.set(it.id, { id: it.id, kind: it.kind, pos: [it.pos[0], it.pos[1], it.pos[2]], seen: t, hp: it.hp })
     }
     vis(this.pickups, obs.pickups)
+    for (const m of obs.mechs) if (m.kind === "npc") this.drones.set(m.id, { id: m.id, pos: [m.pos[0], m.pos[1], m.pos[2]], seen: t, hp: m.hp })
     vis(this.crates, obs.crates)
     vis(this.cubes, obs.cubes)
     // forget remembered items that should be visible (close) but are not listed
@@ -140,6 +171,8 @@ export class Brain {
     }
     forget(this.pickups, 30)
     forget(this.crates, 30)
+    forget(this.drones, 35)
+    for (const [id, k] of this.drones) if (t - k.seen > 90) this.drones.delete(id)
     forget(this.cubes, 25)
     for (const [id, k] of this.cubes) if (t - k.seen > 60) this.cubes.delete(id)
     for (const ev of obs.events) {
@@ -239,6 +272,7 @@ export class Brain {
   // ------------------------------------------------------------------ main
   act(obs: Observation): BotAction {
     const t0 = now()
+    this.tickStart = t0
     this.remember(obs)
     const me = obs.self
     const t = obs.t
@@ -495,7 +529,7 @@ export class Brain {
     const needNext = Math.hypot(x - zn.next_center[0], y - zn.next_center[1]) - Math.max(0, zn.next_radius - Math.min(25, zn.next_radius * 0.3))
     const eta = Math.max(0, needNext) * 1.35 / walk
     const zoneUrgent = !me.in_zone || hit < eta + 10
-    if (zoneUrgent) {
+    if (zoneUrgent && !this.roofs.roofAt(this.map, x, y, z)) {
       const dx = x - zn.next_center[0], dy = y - zn.next_center[1]
       const dl = Math.hypot(dx, dy) || 1
       const rr = Math.max(0, zn.next_radius - Math.min(30, zn.next_radius * 0.4))
@@ -504,8 +538,80 @@ export class Brain {
       this.mode = "zone"
     }
 
+    // rooftops
+    const curRoof = this.roofs.roofAt(this.map, x, y, z)
+    const roofActive = P.roof && t >= P.roofFrom && (!!slot1 || t >= P.roofFrom + P.roofWeaponGrace) && !zoneUrgent
+    this.campRoof = null
+    let roofBusy = false
+    if (!roofActive) {
+      this.roof = null
+      this.climbing = false
+    } else if (!this.roof || t - this.roofPickT > 4 || !this.roofOk(obs, this.roof)) {
+      const r = this.pickRoof(obs, x, y, curRoof)
+      if (r !== this.roof) {
+        this.climb = null
+        this.climbing = false
+      }
+      this.roof = r
+      this.roofPickT = t
+    }
+    if (this.roof && roofActive) {
+      const r = this.roof
+      if (curRoof === r) {
+        this.climbing = false
+        this.climb = null
+        this.campRoof = r
+        roofBusy = true
+        this.mode = "roof"
+        if (Math.hypot(r.campX - x, r.campY - y) > 2.5) goal = [r.campX, r.campY]
+      } else if (!curRoof && (!fighting || this.climbing || !(focus && focus.los))) {
+        if (!this.climb) this.climb = this.pickClimb(r, x, y)
+        const c = this.climb
+        if (c) {
+          roofBusy = true
+          const dg = Math.hypot(c.gx - x, c.gy - y)
+          if (this.climbing) this.mode = "climb"
+          else if (dg > 3) {
+            goal = [c.gx, c.gy]
+            this.mode = "to-roof"
+          } else {
+            const need = Math.min(95, (c.ez - z) * 1.8 + 15)
+            if (me.energy >= need) {
+              this.climbing = true
+              this.climbStart = t
+              this.mode = "climb"
+            } else this.mode = "roof-wait"
+          }
+        } else this.roof = null
+      }
+    }
+
+    // on a roof we are not camping on (zone moved, or a better roof): walk to the edge nearest
+    // where we are going and step off it. Never jet: that only lifts us higher.
+    let descend: [number, number] | null = null
+    if (curRoof && this.campRoof !== curRoof && !this.climbing) {
+      const tgt = this.roof ? this.pickClimb(this.roof, x, y) : null
+      const tx = tgt ? tgt.gx : zn.next_center[0], ty = tgt ? tgt.gy : zn.next_center[1]
+      let best: Climb | null = null
+      let bs = Infinity
+      for (const c of curRoof.climbs) {
+        const s = Math.hypot(c.gx - tx, c.gy - ty) + Math.hypot(c.ex - x, c.ey - y) * 0.7
+        if (s < bs) {
+          bs = s
+          best = c
+        }
+      }
+      if (best) {
+        roofBusy = true
+        this.mode = "descend"
+        this.descendComp = curRoof.comp
+        if (Math.hypot(best.ex - x, best.ey - y) > 2.5) goal = [best.ex, best.ey]
+        else descend = norm2(best.gx - x, best.gy - y)
+      }
+    }
+
     // retreat to cover
-    if (!goal && this.retreating && fighting) {
+    if (!goal && this.retreating && fighting && !roofBusy) {
       if (t - this.coverT > 1.5 || Number.isNaN(this.coverX)) this.pickCover(obs, engaged)
       if (!Number.isNaN(this.coverX)) {
         goal = [this.coverX, this.coverY]
@@ -515,7 +621,7 @@ export class Brain {
     }
 
     // supply drop
-    if (!goal && !this.retreating) {
+    if (!goal && !this.retreating && !roofBusy) {
       for (const dr of obs.drops ?? []) {
         if (dr.holder != null && dr.holder !== this.myId) continue
         const d = Math.hypot(dr.pos[0] - x, dr.pos[1] - y)
@@ -532,10 +638,10 @@ export class Brain {
 
     // fighting movement (range band + strafe) is computed below; here we pick approach goals
     let fightMove = false
-    if (!goal && fighting && focus) {
+    if (!goal && fighting && focus && !this.campRoof && !this.climbing) {
       const band = this.band(me)
       if (focus.los) fightMove = true
-      else if (P.hunt && !this.retreating && hpFrac > 0.55 && t - focus.seen < 5 && focus.d < 160) {
+      else if (P.hunt && !this.retreating && hpFrac > P.huntMinHp && t - focus.seen < 5 && focus.d < P.huntRange) {
         goal = [focus.pos[0], focus.pos[1]]
         this.mode = "hunt"
       } else fightMove = true
@@ -543,9 +649,9 @@ export class Brain {
     }
 
     // cubes nearby
-    if (!goal && !fightMove) {
+    if (!goal && !fightMove && !roofBusy) {
       let best: Known | null = null
-      let bd = fighting ? 12 : 90
+      let bd = fighting ? (engaged.some((e) => e.los) ? P.cubeFightRange : Math.max(P.cubeFightRange, 40)) : P.cubeRange
       for (const c of this.cubes.values()) {
         const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
         if (d < bd && Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) < 3 && this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 5)) {
@@ -560,7 +666,7 @@ export class Brain {
     }
 
     // weapon loot
-    if (!goal && !fighting) {
+    if (!goal && !fighting && !roofBusy) {
       let best: Known | null = null
       let bs = Infinity
       for (const p of this.pickups.values()) {
@@ -588,25 +694,33 @@ export class Brain {
     }
 
     // farm: walk toward remembered crates / drones
-    if (!goal && farmOk && t < P.farmUntil && !target) {
+    if (!goal && farmOk && t < P.farmUntil && !target && !roofBusy) {
       let best: Known | null = null
-      let bd = 150
-      for (const c of this.crates.values()) {
+      let bs = Infinity
+      let bestIsDrone = false
+      const consider = (c: Known, value: number, drone: boolean) => {
         const d = Math.hypot(c.pos[0] - x, c.pos[1] - y)
-        if (d < bd && Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) < 2.5 && this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 8)) {
-          bd = d
+        if (d > P.farmRange || Math.abs(c.pos[2] - this.map.surfAt(c.pos[0], c.pos[1])) > 3) return
+        if (!this.safe(obs, c.pos[0], c.pos[1], d / walk + 5, 8)) return
+        const s = d - value
+        if (s < bs) {
+          bs = s
           best = c
+          bestIsDrone = drone
         }
       }
-      if (best && bd > 25) {
-        goal = [best.pos[0], best.pos[1]]
-        this.mode = "farm"
+      for (const c of this.crates.values()) consider(c, 0, false)
+      if (P.droneValue > 0 && hpFrac > 0.6) for (const c of this.drones.values()) consider(c, P.droneValue, true)
+      const b = best as Known | null
+      if (b && Math.hypot(b.pos[0] - x, b.pos[1] - y) > (bestIsDrone ? 55 : 25)) {
+        goal = [b.pos[0], b.pos[1]]
+        this.mode = bestIsDrone ? "farm-drone" : "farm"
       }
     }
 
     // explore for a weapon while we only have the gun
     this.markVisited(x, y, t)
-    if (!goal && !fightMove && !fighting && !target && !slot1 && hpFrac > 0.4 && t < P.exploreUntil) {
+    if (!goal && !fightMove && !fighting && !target && !slot1 && hpFrac > 0.4 && t < P.exploreUntil && !roofBusy) {
       const reached = Math.hypot(this.expX - x, this.expY - y) < 12
       if (Number.isNaN(this.expX) || reached || t - this.expT > 30 || !this.safe(obs, this.expX, this.expY, 25, 15)) this.pickExplore(obs)
       if (!Number.isNaN(this.expX)) {
@@ -615,8 +729,12 @@ export class Brain {
       }
     }
 
+    // shooting a drone or crate with nobody around: stand still (silent, steadier aim)
+    const farmShoot = !goal && !fightMove && !fighting && !!target && target.kind !== "mech" && P.droneValue > 0
+    if (farmShoot) this.mode = "farm-shoot"
+
     // hold near cover inside the next circle
-    if (!goal && !fightMove) {
+    if (!goal && !fightMove && !roofBusy && !farmShoot) {
       if (t - this.holdT > 6 || Number.isNaN(this.holdX) || !this.safe(obs, this.holdX, this.holdY, 20, 6)) this.pickHold(obs)
       if (!Number.isNaN(this.holdX)) {
         if (Math.hypot(this.holdX - x, this.holdY - y) > 3) goal = [this.holdX, this.holdY]
@@ -624,7 +742,13 @@ export class Brain {
       }
     }
 
+    const wantComp = this.mode === "roof" && this.campRoof ? this.campRoof.comp : this.mode === "descend" ? this.descendComp : -1
+    if (wantComp !== this.nav.goalComp) {
+      this.nav.goalComp = wantComp
+      this.nav.lastPlan = -1e9
+    }
     if (goal) {
+      this.nav.budgetMs = Math.max(2, Math.min(10, this.budget() - 4))
       this.nav.setGoal(goal[0], goal[1], t, x, y)
       move = this.nav.steer(x, y)
       boost = goalBoost
@@ -634,22 +758,33 @@ export class Brain {
       this.mode = this.retreating ? "retreat-fight" : "fight"
       move = this.fightMove(me, focus, t)
       boost = me.energy > 60 && !lightning
+      // the gun only hits jinking targets reliably inside ~70 m: get there fast
+      if (P.closeBoost && !this.retreating && focus.d > this.band(me)[1] + 10 && me.energy > 25) boost = true
       // kite lightning carriers we can't match up close
       if (P.kite && !lightning && focus.weapons.includes("lightning") && focus.d < 60 && me.energy > 8) boost = true
+    } else if (this.campRoof && fighting && focus && !goal) {
+      // on the roof: small side-steps around the camp spot, never off the edge
+      this.updateStrafe(t)
+      const by = Math.atan2(focus.pos[1] - y, focus.pos[0] - x)
+      const sx = -Math.sin(by) * this.strafeSign, sy = Math.cos(by) * this.strafeSign
+      const far = Math.hypot(this.campRoof.campX - x, this.campRoof.campY - y) > 5
+      const m2: [number, number] = far ? norm2(this.campRoof.campX - x, this.campRoof.campY - y) : [sx, sy]
+      if (this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) move = m2
+      else this.strafeSign = -this.strafeSign
     } else if (fighting && goal && focus && this.mode !== "zone") {
       // moving with enemies around: blend in a bit of strafe
       const by = Math.atan2(focus.pos[1] - y, focus.pos[0] - x)
       this.updateStrafe(t)
       const sx = -Math.sin(by) * this.strafeSign, sy = Math.cos(by) * this.strafeSign
       const m2 = norm2(move[0] + sx * 0.35, move[1] + sy * 0.35)
-      if (this.map.walkLine(x, y, x + m2[0] * 3, y + m2[1] * 3)) move = m2
+      if (this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) move = m2
     }
 
     // dodge incoming fire
     const dodge = this.dodge(obs, me)
     if (dodge) {
       const m2 = norm2(move[0] * 0.4 + dodge[0], move[1] * 0.4 + dodge[1])
-      if (this.map.walkLine(x, y, x + m2[0] * 3, y + m2[1] * 3)) {
+      if (this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) {
         move = m2
         if (me.energy > 15) boost = true
       }
@@ -674,9 +809,31 @@ export class Brain {
       } else this.duckT = -1e9
     }
 
+    if (descend) {
+      move = descend
+      jump = false
+      boost = false
+    }
+    if (this.climbing && this.climb) {
+      const c = this.climb
+      const r = this.roof!
+      let [mx, my] = norm2(c.ex - x, c.ey - y)
+      if (Math.hypot(c.ex - x, c.ey - y) < 1.5) [mx, my] = norm2(r.campX - x, r.campY - y)
+      move = [mx, my]
+      jump = me.grounded && z < c.ez - 0.5
+      boost = !me.grounded && z < c.ez + 2.5 && me.energy > 0.5
+      this.mode = "climb"
+      const fellBack = me.grounded && t - this.climbStart > 1.2 && z < c.gz + 1.5 && me.energy < 10
+      if (t - this.climbStart > 7 || fellBack) {
+        this.badClimbs.add(c.ex + "," + c.ey)
+        this.climbing = false
+        this.climb = null
+      }
+    }
+
     // stuck recovery
     const commanded = Math.hypot(move[0], move[1]) > 0.5
-    if (this.nav.updateStuck(t, x, y, commanded && this.mode !== "fight", move, this.rnd)) {
+    if (!this.climbing && !this.campRoof && this.mode !== "descend" && this.nav.updateStuck(t, x, y, commanded && this.mode !== "fight", move, this.rnd)) {
       move = this.nav.stuckDir
       if (me.grounded && this.nav.stuckCount % 2 === 0) jump = true
       if (!me.grounded && me.energy > 10) boost = true
@@ -685,7 +842,7 @@ export class Brain {
     // node, jumping and jetting over whatever is in the way
     const isMain = (n: number) => this.map.isMain(n)
     const onMain = this.map.nearestNode(x, y, 1, isMain) >= 0
-    if (!onMain && !fightMove && (!goal || this.nav.partial || this.nav.path.length === 0)) {
+    if (!onMain && !fightMove && !this.climbing && !this.campRoof && this.mode !== "descend" && (!goal || this.nav.partial || this.nav.path.length === 0)) {
       if (t - this.escT > 1 || Number.isNaN(this.escX)) {
         const n = this.map.nearestNode(x, y, 70, isMain)
         this.escT = t
@@ -747,7 +904,7 @@ export class Brain {
         const dl = Math.hypot(dx, dy)
         this.mode = "peek"
         if (dl > 1.5) {
-          if (this.map.walkLine(x, y, pk[0], pk[1])) return [dx / dl, dy / dl]
+          if (this.walkOk(x, y, pk[0], pk[1])) return [dx / dl, dy / dl]
           this.nav.setGoal(pk[0], pk[1], t, x, y)
           return this.nav.steer(x, y)
         }
@@ -758,13 +915,13 @@ export class Brain {
     for (let attempt = 0; attempt < 2; attempt++) {
       const sx = -fy * this.strafeSign, sy = fx * this.strafeSign
       const m = norm2(sx + fx * radial, sy + fy * radial)
-      if (this.map.walkLine(x, y, x + m[0] * 4, y + m[1] * 4)) return m
+      if (this.walkOk(x, y, x + m[0] * 4, y + m[1] * 4)) return m
       this.strafeSign = -this.strafeSign
       this.strafeFlip = t + 0.6 + this.rnd() * 0.5
     }
     // boxed in: just move radially if possible
     const m = norm2(fx * (radial || 0.5), fy * (radial || 0.5))
-    if (this.map.walkLine(x, y, x + m[0] * 4, y + m[1] * 4)) return m
+    if (this.walkOk(x, y, x + m[0] * 4, y + m[1] * 4)) return m
     return [0, 0]
   }
 
@@ -836,7 +993,8 @@ export class Brain {
     let best = -1
     let bs = Infinity
     const radii = [8, 14, 22, 32, 45, 60]
-    for (const r of radii)
+    for (const r of radii) {
+      if (this.budget() < 4) break
       for (let a = 0; a < 16; a++) {
         const ang = (a / 16) * TAU
         const cx = x + Math.cos(ang) * r, cy = y + Math.sin(ang) * r
@@ -863,6 +1021,7 @@ export class Brain {
           best = n
         }
       }
+    }
     if (best >= 0) {
       this.coverX = m.nodeX(best)
       this.coverY = m.nodeY(best)
@@ -880,6 +1039,52 @@ export class Brain {
       this.coverX = x + ux * 30
       this.coverY = y + uy * 30
     }
+  }
+
+  /** Straight walk that also stays on the roof we camp on (away from its edge). */
+  private walkOk(x: number, y: number, px: number, py: number): boolean {
+    if (!this.map.walkLine(x, y, px, py)) return false
+    const r = this.campRoof
+    if (!r) return true
+    const n = this.map.nodeOf(px, py)
+    return this.map.comp[n] === r.comp && this.roofs.edge[n] >= 2
+  }
+
+  private roofOk(obs: Observation, r: Roof): boolean {
+    const zn = obs.zone
+    return this.safe(obs, r.campX, r.campY, 40, 12) && Math.hypot(r.campX - zn.next_center[0], r.campY - zn.next_center[1]) <= zn.next_radius - 8
+  }
+
+  private pickRoof(obs: Observation, x: number, y: number, cur: Roof | null): Roof | null {
+    if (cur && this.roofOk(obs, cur)) return cur
+    let best: Roof | null = null
+    let bs = Infinity
+    for (const r of this.roofs.roofs) {
+      if (!this.roofOk(obs, r)) continue
+      let d = Infinity
+      for (const c of r.climbs) if (!this.badClimbs.has(c.ex + "," + c.ey)) d = Math.min(d, Math.hypot(c.gx - x, c.gy - y))
+      if (d > P.roofMaxTravel) continue
+      const s = d - r.edgeDist * 2.5
+      if (s < bs) {
+        bs = s
+        best = r
+      }
+    }
+    return best
+  }
+
+  private pickClimb(r: Roof, x: number, y: number): Climb | null {
+    let best: Climb | null = null
+    let bd = Infinity
+    for (const c of r.climbs) {
+      if (this.badClimbs.has(c.ex + "," + c.ey)) continue
+      const d = Math.hypot(c.gx - x, c.gy - y)
+      if (d < bd) {
+        bd = d
+        best = c
+      }
+    }
+    return best
   }
 
   private aimedAtUs(m: ActorObs, x: number, y: number, z: number): boolean {
@@ -917,7 +1122,8 @@ export class Brain {
     type S = { x: number; y: number; vis: boolean; hid: boolean }
     const pts: S[] = []
     const radii = [0, 4, 8, 12, 16, 21, 27]
-    for (const r of radii)
+    for (const r of radii) {
+      if (this.budget() < 4) break
       for (let k = 0; k < (r === 0 ? 1 : 12); k++) {
         const a = (k / 12) * TAU + r * 0.1
         const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r
@@ -930,6 +1136,7 @@ export class Brain {
         const hid = !vis && this.bodyHidden([e], px, py, pz)
         pts.push({ x: px, y: py, vis, hid })
       }
+    }
     const hidden = pts.filter((p) => p.hid)
     let best: S | null = null
     let bs = Infinity
@@ -973,13 +1180,14 @@ export class Brain {
     const c0 = chargers[0]
     const away = Math.atan2(y - c0.pos[1], x - c0.pos[0])
     for (const r of [2.5, 4, 5.5, 7, 8.5, 10]) {
+      if (this.budget() < 2) break
       let best: [number, number] | null = null
       let bs = Infinity
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * TAU
         const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r
         const c = m.idx(px, py)
-        if (!m.walk1[c] || !m.walkLine(x, y, px, py)) continue
+        if (!m.walk1[c] || !this.walkOk(x, y, px, py)) continue
         if (!this.bodyHidden(chargers, px, py, m.surf[c])) continue
         const s = Math.abs(angDiff(a, away))
         if (s < bs) {

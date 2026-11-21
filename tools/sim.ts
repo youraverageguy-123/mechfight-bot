@@ -17,6 +17,7 @@ const cfg = HELLO.config
 const map = new GameMap(HELLO.map.dir, cfg.mech)
 const DT = 1 / cfg.match.tick_hz
 
+type Npc = { id: number; home: number[]; pos: number[]; hp: number; cd: number; aggroT: number }
 type Item = { id: number; kind: string; pos: number[]; crate?: boolean; hp?: number }
 type Shot = { pos: number[]; vel: number[]; owner: number; dmg: number; life: number }
 type Mech = {
@@ -54,7 +55,9 @@ function zoneAt(z: any, t: number) {
   return [z.center[0] + (z.next_center[0] - z.center[0]) * f, z.center[1] + (z.next_center[1] - z.center[1]) * f, z.radius + (z.next_radius - z.radius) * f]
 }
 
+let SR: () => number = Math.random
 function runMatch(seed: number, skill: number, give: string, nHunters: number, armed: boolean) {
+  SR = makeRng(seed * 104729 + 7)
   const rnd = makeRng(seed * 7919 + 1)
   const spawns: number[][] = []
   const z0 = zoneInfo(0)
@@ -92,6 +95,23 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   }
   for (let k = 0; k < 30; k++) items.push({ id: nextId++, kind: KINDS[Math.floor(rnd() * KINDS.length)], pos: randNode() })
   for (let k = 0; k < 27; k++) items.push({ id: 1000 + k, kind: "crate", pos: randNode(), crate: true, hp: 300 })
+  const npcs: Npc[] = []
+  for (let k = 0; k < cfg.npc.count; k++) {
+    const h = randNode()
+    npcs.push({ id: 100 + k, home: h.slice(), pos: h.slice(), hp: cfg.npc.hp, cd: 0, aggroT: -99 })
+  }
+  const cubes: Item[] = []
+  let cubeId = 5000
+  const dropCubes = (pos: number[], n: number) => {
+    for (let k = 0; k < n; k++) cubes.push({ id: cubeId++, kind: "cube", pos: [pos[0] + (rnd() - 0.5) * 3, pos[1] + (rnd() - 0.5) * 3, pos[2]] })
+  }
+  let gotCubes = 0
+  let dronesKilled = 0
+  const UPG = ["armor", "plating", "nanites", "gun_rate", "gun_damage", "sensors", "servos", "gyros"]
+  const thresholds: number[] = cfg.cubes.upgrade_thresholds
+  let offers = 0
+  let pendingOffer: any = null
+  const applied: Record<string, number> = {}
   const brain = new Brain({ ...HELLO, slot: 0, seed: seed }, map)
   const shots: Shot[] = []
   let kills = 0
@@ -105,6 +125,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   let still = 0
   const dur = cfg.match.duration_s
   let activated = 1
+  const world: any = { npcs: [], cubes: [], offer: null }
   const pickedAt: number[] = []
   let cratesBroken = 0
   const fired = [0, 0], hits = [0, 0]
@@ -114,6 +135,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     const bearing = Math.atan2(fromY - vi.pos[1], fromX - vi.pos[0])
     const rear = by && Math.abs(angDiff(bearing, vi.aim[0])) > Math.PI / 2
     if (rear) amt *= cfg.mech.rear_mult
+    if (vi.id === 0) amt *= Math.max(0.5, 1 - 0.08 * (applied.armor ?? 0))
     vi.hp -= amt
     vi.lastDmg = t
     if (by) by.lastDmg = t
@@ -124,6 +146,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
     if (vi.hp <= 0 && vi.alive) {
       vi.alive = false
       vi.diedAt = t
+      dropCubes(vi.pos, vi.cubes + cfg.cubes.death_drop_extra)
       if (by && by.id === 0) {
         kills++
         by.events.push({ type: "kill", target: vi.id })
@@ -146,13 +169,13 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       for (const m of mechs) {
         if (!m.alive) continue
         if (m.id === 0) {
-          const obs = buildObs(m, mechs, shots, zone, t, tick, items)
+          const obs = buildObs(m, mechs, shots, zone, t, tick, items, world)
           const t0 = performance.now()
           m.act = brain.act(obs)
           modes[brain.mode] = (modes[brain.mode] ?? 0) + 1
           if (process.env.TRACE && tick % 10 === 0) {
             const en = mechs.filter((q) => q.id > 0 && q.alive && q.active).map((q) => `${q.id}:${q.weapons[1]?.kind?.[0] ?? "g"}:${Math.round(Math.hypot(q.pos[0] - m.pos[0], q.pos[1] - m.pos[1]))}m:${Math.round(q.hp)}`).join(" ")
-            console.log(`t${t.toFixed(0)} ${brain.mode} hp${Math.round(m.hp)} w:${m.weapons[1]?.kind ?? "-"} fire:${JSON.stringify(m.act.fire)} | ${en}`)
+            console.log(`t${t.toFixed(0)} ${brain.mode} z${m.pos[2].toFixed(1)} e${Math.round(m.energy)} hp${Math.round(m.hp)} w:${m.weapons[1]?.kind ?? "-"} fire:${JSON.stringify(m.act.fire)} | ${en}`)
           }
           const ms = performance.now() - t0
           tms.push(ms)
@@ -192,9 +215,9 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       const ml = Math.hypot(mv[0], mv[1])
       if (ml > 1) mv = [mv[0] / ml, mv[1] / ml]
       const charging = m.weapons.some((w) => w && w.kind === "laser" && w.charge > 0)
-      let sp = a.boost && m.energy > 0 && ml > 0.1 ? cfg.mech.boost_speed : cfg.mech.walk_speed
+      let sp = a.boost && m.energy > 0 && ml > 0.1 && m.grounded ? cfg.mech.boost_speed : cfg.mech.walk_speed
       if (charging) sp *= 0.5
-      if (a.boost && ml > 0.1) {
+      if (a.boost && ml > 0.1 && m.grounded) {
         m.energy -= cfg.mech.boost_drain * DT
         m.lastSpend = t
       }
@@ -206,7 +229,9 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       const nx = m.pos[0] + m.vel[0] * DT, ny = m.pos[1] + m.vel[1] * DT
       const okAt = (x: number, y: number) => {
         const c = map.idx(x, y)
-        return map.walk1[c] && map.surf[c] - m.pos[2] <= cfg.mech.step_up + 0.05
+        if (map.surf[c] - m.pos[2] > cfg.mech.step_up + 0.05) return false // wall (feet below its top)
+        if (map.head[c] < m.pos[2] + 9) return false // overhang
+        return map.walk1[c] || map.surf[c] < m.pos[2] - 2 // dropping off an edge is fine
       }
       if (okAt(nx, ny)) {
         m.pos[0] = nx
@@ -220,7 +245,28 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       } else {
         m.vel[0] = m.vel[1] = 0
       }
-      m.pos[2] = map.surfAt(m.pos[0], m.pos[1])
+      const floor = map.surfAt(m.pos[0], m.pos[1])
+      if (m.grounded && a.jump) {
+        m.vel[2] = cfg.mech.jump_speed
+        m.grounded = false
+      }
+      if (!m.grounded) {
+        if (a.boost && m.energy > 0) {
+          m.vel[2] = Math.min(cfg.mech.max_rise_speed, m.vel[2] + cfg.mech.jet_accel * DT)
+          m.energy -= cfg.mech.jet_drain * DT
+          m.lastSpend = t
+        }
+        m.vel[2] -= cfg.mech.gravity * DT
+        m.pos[2] += m.vel[2] * DT
+        if (m.pos[2] <= floor) {
+          m.pos[2] = floor
+          m.vel[2] = 0
+          m.grounded = true
+        }
+      } else if (floor < m.pos[2] - 1.5) {
+        m.grounded = false // walked off an edge
+        m.vel[2] = 0
+      } else m.pos[2] = floor
       if (t - m.lastSpend > cfg.mech.energy_regen_delay) m.energy = Math.min(100, m.energy + cfg.mech.energy_regen * DT)
       // regen + zone
       const [zx, zy, zr] = zoneAt(zone, t)
@@ -252,7 +298,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             const d = [Math.cos(pit) * Math.cos(yaw), Math.cos(pit) * Math.sin(yaw), Math.sin(pit)]
             const o = [m.pos[0] + d[0] * 3, m.pos[1] + d[1] * 3, m.pos[2] + 7 + d[2] * 3]
             fired[m.id === 0 ? 0 : 1]++
-            shots.push({ pos: o, vel: d.map((v) => v * w.stats.speed), owner: m.id, dmg: w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)), life: w.stats.range / w.stats.speed })
+            shots.push({ pos: o, vel: d.map((v) => v * w.stats.speed), owner: m.id, dmg: w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)) * (m.id === 0 ? Math.pow(1.15, applied.gun_damage ?? 0) : 1), life: w.stats.range / w.stats.speed })
           }
         } else if (w.kind === "lightning") {
           if (fire[s] && w.cooldown <= 0 && m.energy >= w.stats.energy) {
@@ -268,7 +314,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
               if (!map.clear(m.pos[0], m.pos[1], m.pos[2] + 7, o.pos[0], o.pos[1], o.pos[2] + 4.5, 3, 2)) continue
               if (d < bd) { bd = d; best = o }
             }
-            if (best) damage(best, w.stats.damage, m, "lightning", m.pos[0], m.pos[1], t)
+            if (best) damage(best, w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)), m, "lightning", m.pos[0], m.pos[1], t)
           }
         } else if (w.kind === "laser") {
           if (fire[s] && w.cooldown <= 0) w.charge = Math.min(w.stats.charge + w.stats.hold_s, w.charge + DT)
@@ -288,7 +334,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
               const tt = rayCyl(o, d, q.pos, 2.5, 9)
               if (tt !== null && tt < ht && tt < w.stats.range) { ht = tt; hitM = q }
             }
-            if (hitM && map.clear(o[0], o[1], o[2], o[0] + d[0] * ht, o[1] + d[1] * ht, o[2] + d[2] * ht, 3, 1)) damage(hitM, dmg, m, "laser", m.pos[0], m.pos[1], t)
+            if (hitM && map.clear(o[0], o[1], o[2], o[0] + d[0] * ht, o[1] + d[1] * ht, o[2] + d[2] * ht, 3, 1)) damage(hitM, dmg * (1 + 0.04 * Math.min(m.cubes, 10)), m, "laser", m.pos[0], m.pos[1], t)
           }
         }
       }
@@ -318,6 +364,19 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
             }
           }
         }
+        for (let ni = npcs.length - 1; ni >= 0 && !dead; ni--) {
+          const q = npcs[ni]
+          if (Math.hypot(s.pos[0] - q.pos[0], s.pos[1] - q.pos[1]) < 1.8 + 0.3 && s.pos[2] > q.pos[2] - 0.2 && s.pos[2] < q.pos[2] + 3.6) {
+            dead = true
+            q.hp -= s.dmg
+            q.aggroT = t
+            if (q.hp <= 0) {
+              npcs.splice(ni, 1)
+              dropCubes(q.pos, cfg.npc.cubes)
+              if (s.owner === 0) dronesKilled++
+            }
+          }
+        }
         if (dead) break
         for (const m of mechs) {
           if (!m.alive || m.id === s.owner || !m.active) continue
@@ -332,6 +391,49 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
       s.life -= DT
       if (dead || s.life <= 0) shots.splice(i, 1)
     }
+    // drones: shoot our bot if close (or attacked recently), hit 50% of the time
+    for (const q of npcs) {
+      q.cd -= DT
+      const d = Math.hypot(me.pos[0] - q.pos[0], me.pos[1] - q.pos[1])
+      const aggro = (t - q.aggroT < 10 && d < cfg.npc.deaggro_range) || d < cfg.npc.aggro_range
+      if (aggro && q.cd <= 0 && map.clear(q.pos[0], q.pos[1], q.pos[2] + 2, me.pos[0], me.pos[1], me.pos[2] + 4.5, 2, 2)) {
+        q.cd = cfg.npc.cooldown
+        if (rnd() < 0.5) damage(me, cfg.npc.damage, null, "npc", q.pos[0], q.pos[1], t)
+      }
+    }
+    for (let ci = cubes.length - 1; ci >= 0; ci--) {
+      const c = cubes[ci]
+      if (Math.hypot(c.pos[0] - me.pos[0], c.pos[1] - me.pos[1]) < cfg.cubes.pickup_radius && Math.abs(c.pos[2] - me.pos[2]) < 4) {
+        cubes.splice(ci, 1)
+        me.cubes++
+        gotCubes++
+        if (me.cubes <= cfg.cubes.stat_cap) {
+          const add = me.maxHp * cfg.cubes.hp_per_cube
+          me.maxHp += add
+          me.hp += add
+        }
+        me.events.push({ type: "pickup", cubes: me.cubes })
+        if (thresholds.includes(me.cubes)) offers++
+      }
+    }
+    if (!pendingOffer && offers > 0) {
+      const ch = UPG.filter((u) => (applied[u] ?? 0) < 3).sort(() => rnd() - 0.5).slice(0, 3)
+      pendingOffer = { id: offers, expires: t + 5, choices: ch.map((c) => ({ id: c, name: c, desc: c })) }
+    }
+    if (pendingOffer && me.act.pick != null) {
+      const u = pendingOffer.choices[me.act.pick]?.id
+      if (u) {
+        applied[u] = (applied[u] ?? 0) + 1
+        if (u === "plating") { me.maxHp *= 1.15; me.hp *= 1.15 }
+        if (u === "gun_rate" && me.weapons[0]) me.weapons[0].stats.cooldown *= 0.87
+      }
+      pendingOffer = null
+      offers--
+      me.act.pick = undefined
+    }
+    world.npcs = npcs
+    world.cubes = cubes
+    world.offer = pendingOffer
     // stuck metric for our bot
     if (tick % 20 === 0) {
       const mv = mechs[0].act.move ?? [0, 0]
@@ -348,7 +450,16 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const before = mechs.filter((m) => m.id > 0 && m.diedAt < me.diedAt).length
   const place = 16 - before
   tms.sort((a, b) => a - b)
-  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), cubes: gotCubes, drones: dronesKilled, upg: applied, byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+}
+
+function visList(m: any, list: any[], hz: number): any[] {
+  return list.filter((it) => {
+    const d = Math.hypot(it.pos[0] - m.pos[0], it.pos[1] - m.pos[1])
+    const b = Math.atan2(it.pos[1] - m.pos[1], it.pos[0] - m.pos[0])
+    const inFov = d < cfg.vision.range && Math.abs(angDiff(b, m.aim[0])) < (cfg.vision.fov_deg * Math.PI) / 360
+    return (d < cfg.vision.near_range || inFov) && map.clear(m.pos[0], m.pos[1], m.pos[2] + 8, it.pos[0], it.pos[1], it.pos[2] + hz, 0.5, 0.5)
+  })
 }
 
 function gauss(r: () => number) {
@@ -373,18 +484,19 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
   const d = Math.hypot(me.pos[0] - x, me.pos[1] - y)
   const los = d < 200 && map.clear(x, y, m.pos[2] + 7, me.pos[0], me.pos[1], me.pos[2] + 4.5, 3, 2)
   const act: any = {}
-  if (los && d < 150) {
+  const kiter = m.weapons[1]?.kind === "laser"
+  if (los && d < (kiter ? 220 : 150)) {
     // strafe and shoot with (imperfect) lead
     if (t > m.flip) {
       m.strafe = -m.strafe
-      m.flip = t + 0.6 + Math.random() * 1.2
+      m.flip = t + 0.6 + SR() * 1.2
     }
     const b = Math.atan2(me.pos[1] - y, me.pos[0] - x)
-    const rad = d > 90 ? 0.7 : d < 40 ? -0.5 : 0
+    const rad = kiter ? (d > 150 ? 0.7 : d < 100 ? -0.8 : 0) : d > 90 ? 0.7 : d < 40 ? -0.5 : 0
     act.move = [-Math.sin(b) * m.strafe + Math.cos(b) * rad, Math.cos(b) * m.strafe + Math.sin(b) * rad]
     const v = [me.vel[0] * m.skill, me.vel[1] * m.skill, 0]
     const sol = leadStraight(x, y, m.pos[2] + 7, me.pos[0], me.pos[1], me.pos[2] + 4.5, v[0], v[1], 0, 252, 3, me.pos[2] + 2, 22)
-    act.aim = [sol.yaw + (Math.random() - 0.5) * 0.02 * (1 - m.skill), sol.pitch]
+    act.aim = [sol.yaw + (SR() - 0.5) * 0.02 * (1 - m.skill), sol.pitch]
     const err = Math.abs(angDiff(m.aim[0], sol.yaw))
     act.fire = [err < 0.05, false]
     const w1 = m.weapons[1]
@@ -404,6 +516,12 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
     act.aim = [Math.atan2(me.pos[1] - y, me.pos[0] - x), 0]
     act.boost = d > 150
   }
+  if (me.pos[2] > m.pos[2] + 4 && d < 60 && !los) {
+    const b2 = Math.atan2(me.pos[1] - y, me.pos[0] - x)
+    act.move = [Math.cos(b2), Math.sin(b2)]
+    act.jump = m.grounded
+    act.boost = !m.grounded && m.energy > 1
+  }
   // stay in zone
   const [zx, zy, zr] = zoneAt(zone, t + 10)
   if (Math.hypot(x - zx, y - zy) > zr - 10) {
@@ -413,7 +531,7 @@ function hunterAct(m: Mech, me: Mech, t: number, zone: any) {
   return act
 }
 
-function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, tick: number, items: Item[]) {
+function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, tick: number, items: Item[], world: any) {
   const pk: any[] = [], cr: any[] = []
   for (const it of items) {
     const d = Math.hypot(it.pos[0] - m.pos[0], it.pos[1] - m.pos[1])
@@ -444,7 +562,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
     const kind = sp > 15 ? "boost" : sp > 5 ? "step" : null
     if (!kind || tick % 12 !== 0) continue
     if (d > cfg.sound.range[kind]) continue
-    const b = Math.atan2(o.pos[1] - m.pos[1], o.pos[0] - m.pos[0]) + (Math.random() - 0.5) * 0.2
+    const b = Math.atan2(o.pos[1] - m.pos[1], o.pos[0] - m.pos[0]) + (SR() - 0.5) * 0.2
     sounds.push({ kind, bearing: b, dist: d < 60 ? "near" : d < 160 ? "mid" : "far", age: 0.05 })
   }
   const [zx, zy, zr] = zoneAt(zone, t)
@@ -452,10 +570,11 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
     type: "obs", tick, t, alive: mechs.filter((q) => q.alive).length + (16 - mechs.length),
     self: {
       id: m.id, pos: m.pos.slice(), vel: m.vel.slice(), aim: m.aim.slice(), hp: m.hp, max_hp: m.maxHp, energy: m.energy, max_energy: 100,
-      grounded: true, cubes: m.cubes, upgrades: [], weapons: m.weapons.map((w) => (w ? { ...w } : null)), in_zone: Math.hypot(m.pos[0] - zx, m.pos[1] - zy) <= zr,
+      grounded: m.grounded, cubes: m.cubes, upgrades: [], weapons: m.weapons.map((w) => (w ? { ...w } : null)), in_zone: Math.hypot(m.pos[0] - zx, m.pos[1] - zy) <= zr,
       stats: { ...cfg.mech },
     },
-    mechs: vis, projectiles, crates: cr, cubes: [], pickups: pk, sounds, beams: [], events: m.events.slice(), drops: [], zone, offer: null,
+    mechs: vis.concat(visList(m, world.npcs, 3.5).map((q: any) => ({ id: q.id, kind: "npc", pos: q.pos.slice(), vel: [0, 0, 0], aim: [0, 0], hp: q.hp, max_hp: 350 }))),
+    projectiles, crates: cr, cubes: visList(m, world.cubes, 0.5).map((c: any) => ({ id: c.id, pos: c.pos.slice() })), pickups: pk, sounds, beams: [], events: m.events.slice(), drops: [], zone, offer: world.offer,
   } as any
 }
 

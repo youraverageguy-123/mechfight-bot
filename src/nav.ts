@@ -148,6 +148,10 @@ export class Navigator {
   goalNode = -1
   lastPlan = -1e9
   partial = false
+  /** Plan to a node of this component instead of the main ground graph (-1 = main). */
+  goalComp = -1
+  /** Time limit for one A* search (ms); a partial path is used when it runs out. */
+  budgetMs = 10
   // stuck detection
   private hist: { t: number; x: number; y: number; cmd: boolean }[] = []
   stuckUntil = -1
@@ -166,7 +170,9 @@ export class Navigator {
     if (!needs) return
     this.goalX = x
     this.goalY = y
-    const goal = m.nearestNode(x, y, 25, (n) => m.isMain(n))
+    const goal = this.goalComp >= 0
+      ? m.nearestNode(x, y, 6, (n) => m.comp[n] === this.goalComp)
+      : m.nearestNode(x, y, 25, (n) => m.isMain(n))
     const start = m.nearestNode(px, py, 4, (n) => m.navOk[n] === 1 && m.navMask[n] !== 0)
     this.lastPlan = t
     this.goalNode = goal
@@ -174,7 +180,7 @@ export class Navigator {
       this.path = []
       return
     }
-    const p = this.planner.plan(start, goal)
+    const p = this.planner.plan(start, goal, 60000, undefined, this.budgetMs)
     this.partial = !p || p[p.length - 1] !== goal
     this.path = p ?? []
     this.idx = 0
