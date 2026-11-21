@@ -34,6 +34,8 @@ export const P = {
   peek: true, // vs laser carriers, fight from a spot next to cover
   peekMinD: 20,
   duck: true, // hide from lasers being charged at us
+  lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
+  pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
   gunBand: [35, 120] as [number, number],
   lightningBand: [14, 32] as [number, number],
@@ -805,6 +807,8 @@ export class Brain {
       this.mode = this.retreating ? "retreat-fight" : "fight"
       move = this.fightMove(me, focus, t)
       boost = me.energy > 60 && !lightning
+      // lightning shorts lasers and out-damages everything up close: rush in
+      if (P.lightningPush && lightning && !this.retreating && focus.d > P.lightningBand[1] + 4 && focus.d < P.pushMaxD && me.energy > 22) boost = true
       // the gun only hits jinking targets reliably inside ~70 m: get there fast
       if (P.closeBoost && !this.retreating && focus.d > this.band(me)[1] + 10 && me.energy > 25) boost = true
       // kite lightning carriers we can't match up close
@@ -943,6 +947,14 @@ export class Brain {
     else if (e.d < band[0]) radial = -0.7
     // enemy holds lightning and we don't: keep out of its arc
     if (!this.weapon(me, "lightning") && e.weapons.includes("lightning") && e.d < 55) radial = -0.9
+    if (P.lightningPush && this.weapon(me, "lightning") && !this.retreating && e.d > band[1] && e.d < P.pushMaxD) {
+      // rush: straight in with a light weave
+      this.updateStrafe(t)
+      const m = norm2(fx - fy * this.strafeSign * 0.3, fy + fx * this.strafeSign * 0.3)
+      if (this.walkOk(x, y, x + m[0] * 4, y + m[1] * 4)) return m
+      this.nav.setGoal(e.pos[0], e.pos[1], t, x, y)
+      return this.nav.steer(x, y)
+    }
     // against a laser at range, fight from a spot with a hiding place next to it
     if (P.peek && e.weapons.includes("laser") && e.d > P.peekMinD && !this.retreating) {
       const pk = this.peekSpot(me, e, t)

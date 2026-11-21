@@ -326,10 +326,19 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
               if (!map.clear(m.pos[0], m.pos[1], m.pos[2] + 7, o.pos[0], o.pos[1], o.pos[2] + 4.5, 3, 2)) continue
               if (d < bd) { bd = d; best = o }
             }
-            if (best) damage(best, w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)), m, "lightning", m.pos[0], m.pos[1], t)
+            if (best) {
+              damage(best, w.stats.damage * (1 + 0.04 * Math.min(m.cubes, 10)), m, "lightning", m.pos[0], m.pos[1], t)
+              // short: a laser it hits loses its charge and can't charge for short_s
+              const lw = best.weapons.find((q: any) => q && q.kind === "laser")
+              if (lw) {
+                lw.charge = 0
+                lw.shortUntil = t + (w.stats.short_s ?? 2)
+                if (best.id === 0) best.events.push({ type: "effect", effect: "short", by: m.id })
+              }
+            }
           }
         } else if (w.kind === "laser") {
-          if (fire[s] && w.cooldown <= 0) w.charge = Math.min(w.stats.charge + w.stats.hold_s, w.charge + DT)
+          if (fire[s] && w.cooldown <= 0 && !(t < (w.shortUntil ?? -1))) w.charge = Math.min(w.stats.charge + w.stats.hold_s, w.charge + DT)
           const release = (!fire[s] && w.charge >= w.stats.min_charge) || w.charge >= w.stats.charge + w.stats.hold_s
           if (release && w.charge > 0) {
             if (m.id !== 0) laserShots++
