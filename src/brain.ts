@@ -63,7 +63,7 @@ export const P = {
   isoWatchW: 30, // penalty per watcher that would see us at a spot
   isoLosW: 45, // bonus for keeping line of sight to the target (when our weapons are ready)
   gunR: 85, laserR: 120, lightR: 28, // preferred fighting ranges for iso
-  loseRule: true, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
+  loseRule: false, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
   gTarget: true, // target score: distance + 0.18 HP, minus big bonuses for wounded (< 30 %) and for staying on one target
   gEngage: true, // also fight mechs closing in on us (< 180 m) and wounded mechs (< 40 % HP, < 160 m)
   finishR: 20, // close to this range on a wounded target (< 38 % HP) while we are > 42 % and at most 2 are near (0 = off)
