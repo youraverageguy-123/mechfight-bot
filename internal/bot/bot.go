@@ -295,10 +295,12 @@ func DefaultParams() Params {
 		FinalHold:        true,
 		// Apex-Go v3 verified winners (4.99 192m grand, 6.00 TR_HK1, 9,070 dealt, 3.87x trade, 8 alive wins)
 		LaserCDTrack: true,
-		RearAvoidW:   35,
+		RearAvoidW:   50,
 		CoverReload:  true,
 		RetreatPest:  true,
 		PracticeRim:  0.6,
+		CubeSmart: true, // ohio-ironclad practice setting
+		KillFocus: 1.5, // ohio-ironclad practice setting
 	}
 }
 
