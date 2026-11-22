@@ -357,6 +357,17 @@ func Variants() map[string]func(p *Params) {
 			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200
 			p.Seek, p.SeekHP, p.SeekRange = 60, 0.5, 500
 		},
+		// hunt14-hunt19 (ohio-ironclad, practice only): hunt3 plus one mechanic it leaves off: supply drops
+		// (full repair), a patient opening (hunters escalate with our kills), roofs, focus on the hurt one
+		"sq-hunt14": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.DropRun = 260 },
+		"sq-hunt15": func(p *Params) {
+			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30
+			p.DropRun, p.DropRunHP = 420, 1.01
+		},
+		"sq-hunt16": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.PatientSecs = 45 },
+		"sq-hunt17": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.PatientSecs = 90 },
+		"sq-hunt18": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.RoofInSquad = true },
+		"sq-hunt19": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.KillFocus = 4 },
 		// Opening sets (OpenSet: played until the lobby is known or the opening is over).
 		// o-quiet: we do not fire first on a mech that has not touched us. Real matches, 4-8 PM Saturday:
 		// our mech was hit by a mech inside 20 s in 52% of matches (TigerTown27: 19%), and in 64% of those
