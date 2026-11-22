@@ -17,3 +17,7 @@ each commit message), and wrote three practice-squad additions of our own, each 
 - full-magazine hunts (`HuntAmmo`): top up the gun while watching an idle mech, and open hunts with a
   full magazine;
 - wounded-first seeking (`SeekHurtW`): when seeking, prefer a damaged mech over a slightly nearer one.
+- pre-aim (`PreAim`): when idle, point the gun where the hunter that just went out of view will come
+  back into view, instead of sweeping;
+- hold the angle (`HoldAngle`): with nothing to fetch, stand still while a hunter that hurt us or was
+  closing in is out of view, so it walks into our aim.

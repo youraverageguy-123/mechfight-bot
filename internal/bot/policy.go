@@ -944,6 +944,11 @@ func (b *Bot) think(act *proto.Action) {
 					rq.wantW = 0
 					rq.hold = true
 				}
+			} else if b.P.HoldAngle > 0 && st.name == "squad" && b.holdAngle(hpFrac) {
+				// ohio-ironclad: a hunter is on its way and out of view: let it walk into our aim
+				b.mode = "hold-angle"
+				rq.wantW = 0
+				rq.hold = true
 			} else if sx, sy, sid, ok := b.seekTarget(st, hpFrac); ok && !roofFirst {
 				b.mode = "seek"
 				setGoal(sx, sy, 1.8, false)
@@ -1525,4 +1530,61 @@ func (b *Bot) huntAmmoOK(st stance) bool {
 	}
 	sl := &b.slots[gi]
 	return sl.reload <= 0 && sl.ammo >= stat(sl.stats, "mag", 12)*b.P.HuntAmmo
+}
+
+// ohio-ironclad: hiddenHunter returns the mech seen most recently (within maxAge s and maxD m) that is not
+// in view right now, and where it should be now (its last place, carried on along its last velocity
+// for up to 2 s).
+func (b *Bot) hiddenHunter(maxAge, maxD float64) (*Track, [3]float64) {
+	var best *Track
+	var at [3]float64
+	for _, tr := range b.tracks {
+		if tr.NPC || tr.Listed || b.t-tr.LastSeen > maxAge {
+			continue
+		}
+		if dist2(b.pos, tr.Pos) > maxD {
+			continue
+		}
+		if best == nil || tr.LastSeen > best.LastSeen || (tr.LastSeen == best.LastSeen && tr.ID < best.ID) {
+			best = tr
+		}
+	}
+	if best != nil {
+		dt := math.Min(b.t-best.LastSeen, 2)
+		at = best.Pos
+		at[0] += best.Vel[0] * dt
+		at[1] += best.Vel[1] * dt
+	}
+	return best, at
+}
+
+// ohio-ironclad: preAimYaw points the idle torso at the hunter that just went out of view.
+func (b *Bot) preAimYaw(yaw *float64) bool {
+	tr, at := b.hiddenHunter(b.P.PreAim, 230)
+	if tr == nil {
+		return false
+	}
+	*yaw = math.Atan2(at[1]-b.pos[1], at[0]-b.pos[0])
+	return true
+}
+
+// ohio-ironclad: holdAngle says whether to stand and wait: a mech out of view within 170 m that has hurt
+// us lately or was coming our way when last seen, and enough health to take the first exchange.
+func (b *Bot) holdAngle(hpFrac float64) bool {
+	if hpFrac < 0.5 {
+		return false
+	}
+	tr, _ := b.hiddenHunter(b.P.HoldAngle, 170)
+	if tr == nil {
+		return false
+	}
+	if tr.HurtMeT > 0 && b.t-tr.HurtMeT < 10 {
+		return true
+	}
+	dx, dy := b.pos[0]-tr.Pos[0], b.pos[1]-tr.Pos[1]
+	d := math.Hypot(dx, dy)
+	if d < 1 {
+		return false
+	}
+	return (tr.Vel[0]*dx+tr.Vel[1]*dy)/d > 2 // closing on us at walking pace
 }

@@ -443,6 +443,8 @@ func (b *Bot) idleAim(act *proto.Action, heading float64, haveHeading bool) {
 		yaw = b.lastDmgBear
 	case b.t-b.lastSoundT < 1.5:
 		yaw = b.lastSoundB
+	case b.P.PreAim > 0 && !b.ffa && b.preAimYaw(&yaw):
+		// ohio-ironclad: the gun already points where the hunter will step back into view
 	default:
 		b.scanPhase += b.decide
 		// a slow full sweep: the 120 degree wedge covers everything in about four seconds

@@ -179,6 +179,8 @@ type Params struct {
 	PaceHP    float64 // ... unless our health is back above this fraction (regeneration does the rest)
 	HuntAmmo  float64 // start a hunt only with at least this share of the gun magazine; top up while watching an idle mech
 	SeekHurtW float64 // seek: prefer a wounded mech, counting each missing 1% of its health as this many metres closer
+	PreAim    float64 // idle torso: aim where a mech seen in the last PreAim s (now out of view) will come back into view
+	HoldAngle float64 // with nothing to fetch, stand still while a hunter seen in the last HoldAngle s closes in out of view
 }
 
 func DefaultParams() Params {
