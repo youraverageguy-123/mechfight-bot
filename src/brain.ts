@@ -79,6 +79,18 @@ export const P = {
   slewFire: true, // fire the gun when the torso will be on target after this tick's turn, not only when it already is
   lethal: true, // release a partly charged laser when it already kills the target
   dropHeal: 0, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
+  // ---- hunting idle house bots (idea from the public andrew-zhouu bot's practice notes; our own code) ----
+  // Every house bot that dies before us is a place. Idle ones wait to be found, so with health to spare and
+  // nobody on us, pick a fight with one we expect to win, and go looking for one when there is nothing to do.
+  prey: false, // start fights with idle mechs when our time-to-kill beats theirs by preyRatio
+  preyRatio: 0.9, // (their time to kill us) / (our time to kill them) needed to start one
+  preyR: 180, // ...within this range (laser: preyRL)
+  preyRL: 200,
+  preyHp: 0.6, // ...above this HP fraction
+  preyFrom: 0, // ...from this match time
+  seek: 0, // with nothing to do, walk to the last place of a beatable mech seen in the last `seek` s (0 = off)
+  seekHp: 0.7, // ...above this HP fraction
+  seekR: 320, // ...no farther than this
   dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
@@ -179,6 +191,8 @@ export class Brain {
   lastT = 0
   mode = "start"
   tickMs: number[] = []
+  preyId = -1
+  seekBan = new Map<number, number>()
 
   constructor(hello: Hello, map: GameMap) {
     this.cfg = hello.config
@@ -336,6 +350,11 @@ export class Brain {
     return Math.max(20, dps * mul)
   }
 
+  /** (their time to kill us) / (our time to kill them) in a 1v1 at range d. */
+  private adv(me: SelfObs, e: Enemy, d: number): number {
+    return (me.hp / this.enemyDps(e, d)) / (Math.max(1, e.hp) / this.myDps(me, d))
+  }
+
   // ------------------------------------------------------------------ main
   act(obs: Observation): BotAction {
     const t0 = now()
@@ -392,9 +411,27 @@ export class Brain {
       const dl = Math.hypot(dx, dy)
       return dl > 1 ? -((e.vel[0] - me.vel[0]) * dx + (e.vel[1] - me.vel[1]) * dy) / dl : 0
     }
-    const isThreat = (e: Enemy & { d: number }) =>
+    const isThreat0 = (e: Enemy & { d: number }) =>
       !P.selective || t - e.lastHurtUs < 12 || t - e.aimT < 3 || t - e.weHitT < 12 || e.d < P.threatNear ||
       (P.gEngage && (late || (t - e.seen < 0.5 && ((closingOf(e) > 3 && e.d < 180) || (e.hp < 0.4 * e.maxHp && e.d < 160)))))
+    // prey: an idle mech in sight we expect to beat, while nobody else is on us
+    this.preyId = -1
+    if (P.prey && P.selective && t >= P.preyFrom && hpFrac > P.preyHp && !this.retreating) {
+      const others = mechs.filter((e) => isThreat0(e) && ((e.los && e.d < 220) || t - e.lastHurtUs < 4 || e.d < 50))
+      if (others.length === 0) {
+        const pr = this.weapon(me, "laser") ? P.preyRL : P.preyR
+        let bd = Infinity
+        for (const e of mechs) {
+          if (!e.los || e.d > pr || isThreat0(e)) continue
+          if (this.adv(me, e, e.d) < P.preyRatio) continue
+          if (e.d < bd) {
+            bd = e.d
+            this.preyId = e.id
+          }
+        }
+      }
+    }
+    const isThreat = (e: Enemy & { d: number }) => e.id === this.preyId || isThreat0(e)
     const engaged = mechs.filter((e) => isThreat(e) && ((e.los && e.d < 220) || t - e.lastHurtUs < 4 || e.d < 50))
     const idle: (Enemy & { d: number; los: boolean })[] = []
     if (P.selective)
@@ -942,6 +979,31 @@ export class Brain {
       if (!Number.isNaN(this.expX)) {
         goal = [this.expX, this.expY]
         this.mode = "explore"
+      }
+    }
+
+    // nothing to do: go and find the next idle mech we would beat
+    if (!goal && !fightMove && !fighting && !target && P.seek > 0 && hpFrac > P.seekHp && !roofBusy && !this.ring) {
+      let best: Enemy | null = null
+      let bd = Infinity
+      for (const e of this.enemies.values()) {
+        if (t - e.seen > P.seek || (this.seekBan.get(e.id) ?? 0) > t) continue
+        const d = Math.hypot(e.pos[0] - x, e.pos[1] - y)
+        if (d > P.seekR) continue
+        if (d < 20 && t - e.seen > 0.5) {
+          this.seekBan.set(e.id, t + 20) // we are where it was and it is not here
+          continue
+        }
+        if (this.adv(me, e, Math.min(d, 150)) < P.preyRatio) continue
+        if (!this.safe(obs, e.pos[0], e.pos[1], d / walk + 6, 6)) continue
+        if (d < bd) {
+          bd = d
+          best = e
+        }
+      }
+      if (best) {
+        goal = [best.pos[0], best.pos[1]]
+        this.mode = "seek"
       }
     }
 
