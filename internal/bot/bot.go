@@ -299,6 +299,7 @@ func DefaultParams() Params {
 		CoverReload:  true,
 		RetreatPest:  true,
 		PracticeRim:  0.6,
+		Seek: 30, // ohio-ironclad practice setting
 	}
 }
 
