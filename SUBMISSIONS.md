@@ -308,3 +308,7 @@ that gave the big step (kill focus: weight on a target's missing health) and rea
 | 119 | dbeaa17 (fin-kf2-rb) | 100 with kill focus 2.0 + rear-shot target bonus 0.35 (was 0.25) | pending |
 | 120 | 0f6f03a (fin-ra80) | 100 with rear-arc avoidance 80 | pending |
 | 121 | 21d30a6 (fin-kf35) | 100 with kill focus 3.5 | pending |
+
+Final entry choice (Sun ~15:10 UTC): the user picks 111 (1f12edd, own-all, 6.51, BB-87EDF26C) over 100
+(6.55) because it carries our own additions. Free-for-all play is the same in both (our additions act
+only against the practice squad); 6.51 is well above the top-32 line.
