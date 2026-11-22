@@ -60,7 +60,7 @@ export const P = {
   // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
   iso: true, // fight movement: try 16 spots 6 m around us, keep line of sight to the target, stay hidden from the rest
   isoOthersR: 170, // other mechs within this range count as watchers
-  isoWatchW: 30, // penalty per watcher that would see us at a spot
+  isoWatchW: 50, // penalty per watcher that would see us at a spot
   isoLosW: 45, // bonus for keeping line of sight to the target (when our weapons are ready)
   gunR: 85, laserR: 120, lightR: 28, // preferred fighting ranges for iso
   loseRule: true, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
@@ -71,10 +71,10 @@ export const P = {
   laserSeek: 240, // walk this far for a laser even with another second weapon (0 = off)
   noMortar: true, // never pick up a mortar
   gUp: true, // upgrade order: plating, armor, laser damage/charge, nanites, gun...
-  coverAll: false, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
-  coverReplan: 1.5, // seconds between cover re-picks while retreating
-  coverStay: false, // already hidden from them all: stay put
-  isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
+  coverAll: true, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
+  coverReplan: 0.5, // seconds between cover re-picks while retreating
+  coverStay: true, // already hidden from them all: stay put
+  isoRings: 2, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
   "lightning_range", "servos", "gun_mag", "gun_velocity", "gyros", "lightning_chain", "reactor", "capacitor", "mortar_reload",
