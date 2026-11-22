@@ -302,9 +302,9 @@ Round 15 (final batch; slots free one at a time from 15:42 UTC, cutoff 16:00 UTC
 that gave the big step (kill focus: weight on a target's missing health) and rear-arc avoidance, on the
 6.55 build (our additions off unless listed). Docker check PASS on two. Listed in submit order.
 
-| 116 | 015e103 (fin-kf25) | 100 with kill focus 2.5 (was 1.5) | pending |
-| 117 | 9dc13bc (fin-all-kf25) | 111 (6.51) with kill focus 2.5 | pending |
-| 118 | 9e9e3c0 (fin-kf25-ra80) | 116 + rear-arc avoidance 80 (was 50) | pending |
+| 116 | 015e103 (fin-kf25) | 100 with kill focus 2.5 (was 1.5) | 6.11 (BB-D4570EBF) |
+| 117 | 9dc13bc (fin-all-kf25) | 111 (6.51) with kill focus 2.5 | 6.39 (BB-BE34B9D5) |
+| 118 | 9e9e3c0 (fin-kf25-ra80) | 116 + rear-arc avoidance 80 (was 50) | 6.14 (BB-52A2BD8F) |
 | 119 | dbeaa17 (fin-kf2-rb) | 100 with kill focus 2.0 + rear-shot target bonus 0.35 (was 0.25) | pending |
 | 120 | 0f6f03a (fin-ra80) | 100 with rear-arc avoidance 80 | pending |
 | 121 | 21d30a6 (fin-kf35) | 100 with kill focus 3.5 | pending |
@@ -312,3 +312,8 @@ that gave the big step (kill focus: weight on a target's missing health) and rea
 Final entry choice (Sun ~15:10 UTC): the user picks 111 (1f12edd, own-all, 6.51, BB-87EDF26C) over 100
 (6.55) because it carries our own additions. Free-for-all play is the same in both (our additions act
 only against the practice squad); 6.51 is well above the top-32 line.
+
+Round 15 result: kill focus 2.5 lost about 0.3 (6.11, 6.14; with our additions 6.39) against the 1.5
+family's 6.45 mean. Pushing the setting past who dey's value was wrong; they had already stepped back from
+2.0 to 1.5. Rows 119-121 (kill focus 2.0 / 3.5, rear-arc 80) should not be submitted. The locked entry
+stays 111 (6.51, our additions, kill focus 1.5).
