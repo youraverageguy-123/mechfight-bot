@@ -100,3 +100,29 @@ fuzz 0 errors / 12000.
 | 38 | 51691c2 (exp-ag-fire-r2-drop) | 35 + rings 2 + drop heal | pending |
 | 39 | e589abd (exp-ai-fire-r2-s1) | 36, RNG salt 1 | pending |
 | 40 | 5f57edc (exp-aj-fire-drop-s1) | 37, RNG salt 1 | pending |
+
+Round 4 (builders-3, 48 fixed seeds): giddygiddyboy's MIT Go bot, credited, with per-slot RNG salts (SLOTS.md).
+
+| 41 | a6634a3 (g-base) | giddy bot, no salt | 5.40 (BB-13A0AB92) |
+| 42 | 9bc5d41 (g-dup) | 41, salt only for a slot that does not exist (determinism check) | 5.59 (BB-A5E69B4E) |
+| 43 | e6e1c84 (g-s0-k1) | 41, slot 0 salt 1 | 5.51 (BB-211CD8F0) |
+| 44 | ce829f0 (g-s1-k1) | 41, slot 1 salt 1 | 5.66 (BB-DC3CB257) |
+| 45 | 5ecc07e (g-s2-k1) | 41, slot 2 salt 1 | 5.59 (BB-7792D6F1) |
+| 46 | a8c7f9b (g-s3-k1) | 41, slot 3 salt 1 | 5.26 (BB-F87112B3) |
+
+41 and 42 differ, so matches do not replay exactly: the salt search is closed. Giddy bot mean 5.50 (sd 0.15)
+over six draws, about +0.3 over our own bot's round-2 mean.
+
+Scorer change (Sun 11:30 IST): builders-4 plays 96 fresh random seeds per submission, identical code keeps
+its first builders-4 score, and best builders-3 entries are being rescored. Board (Sun 13:36 IST): #1 6.74,
+#2 6.39, #3 6.21, giddygiddyboy 5.73, top-32 line ~5.78. Per-submission sd on 96 fresh seeds is about 0.3.
+
+Round 5 (builders-4): real parameter variants of the giddy bot.
+
+| 47 | a6634a3 (g-base) | giddy bot, first builders-4 score | pending |
+| 48 | f0a8fe4 (g4-drops) | 47 + take supply drops (full HP, energy, +3 cubes) | pending |
+| 49 | f006d04 (g4-eg0) | 47 + never switch to late hiding | pending |
+| 50 | 9407d03 (g4-eg70) | 47 + late hiding from the 70 m circle (was 140 m) | pending |
+| 51 | 2de4210 (g4-eg240) | 47 + late hiding from the 240 m circle | pending |
+| 52 | 7af8246 (g4-drops-eg70) | 48 + 50 | pending |
+

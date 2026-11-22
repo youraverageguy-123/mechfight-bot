@@ -10,12 +10,12 @@ Base: `g-base` = giddygiddyboy's MIT Go bot (credited in README) with our salt t
 
 | branch | commit | slot | salt | score | points vs base |
 |---|---|---|---|---|---|
-| g-base | a6634a3e2b0a8edcb194f212a2f7b07668a2cd69 | all | 0 | pending | 0 |
-| g-dup | 9bc5d41fed13a6951b141e14099a4b13784fc3b7 | 99 (none) | 1 | pending | determinism check: must equal base |
-| g-s0-k1 | e6e1c84664ae4a0cf072939a615e39cdf1a22d90 | 0 | 1 | pending | |
-| g-s1-k1 | ce829f02242528399da60254481bfab1d6e2a92a | 1 | 1 | pending | |
-| g-s2-k1 | 5ecc07ea3dbb2ed82d3f1e06a5f9879bbb205286 | 2 | 1 | pending | |
-| g-s3-k1 | a8c7f9bddab18a1a36440f5c3f29a68ce844dc0f | 3 | 1 | pending | |
+| g-base | a6634a3e2b0a8edcb194f212a2f7b07668a2cd69 | all | 0 | 5.40 (BB-13A0AB92) | 0 |
+| g-dup | 9bc5d41fed13a6951b141e14099a4b13784fc3b7 | 99 (none) | 1 | 5.59 (BB-A5E69B4E) | determinism check: must equal base |
+| g-s0-k1 | e6e1c84664ae4a0cf072939a615e39cdf1a22d90 | 0 | 1 | 5.51 (BB-211CD8F0) | |
+| g-s1-k1 | ce829f02242528399da60254481bfab1d6e2a92a | 1 | 1 | 5.66 (BB-DC3CB257) | |
+| g-s2-k1 | 5ecc07ea3dbb2ed82d3f1e06a5f9879bbb205286 | 2 | 1 | 5.59 (BB-7792D6F1) | |
+| g-s3-k1 | a8c7f9bddab18a1a36440f5c3f29a68ce844dc0f | 3 | 1 | 5.26 (BB-F87112B3) | |
 | g-s4-k1 | 5f36ae2b88c90c9c377fbbc9f2d8ad33f70d39a4 | 4 | 1 | pending | |
 | g-s5-k1 | 679e587fca71332ab04c11562ec9083f7ef09051 | 5 | 1 | pending | |
 | g-s6-k1 | ed3bccc81c1ab0e549d7f1e4dd26cb72e3f0d3bc | 6 | 1 | pending | |
@@ -44,3 +44,11 @@ Base: `g-base` = giddygiddyboy's MIT Go bot (credited in README) with our salt t
 | g-s13-k2 | be74ee047b1b7eab649c3e61ee0da3b871c9d8ac | 13 | 2 | pending | |
 | g-s14-k2 | 2457600f4e1890b922dab1dabfc4d298ed91c2d4 | 14 | 2 | pending | |
 | g-s15-k2 | 7fd7fc70311aa8913b78f4de36b4c897e510a873 | 15 | 2 | pending | |
+
+## Result: closed (Sun ~13:30 IST)
+
+Base 5.40 and the no-op duplicate 5.59 differ by 9 points over 48 matches, so a rerun of the same bot does
+not replay its matches exactly and single-slot differences cannot be measured. The six runs are draws of
+one bot: mean 5.50, sd 0.15. The organizers have since moved practice to builders-4 (96 fresh random seeds
+per submission, and identical code keeps its first builders-4 score), which ends this method for good.
+
