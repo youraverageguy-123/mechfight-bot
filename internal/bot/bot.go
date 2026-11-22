@@ -187,7 +187,7 @@ func DefaultParams() Params {
 		StrafeMin:     0.35,
 		StrafeMax:     1.1,
 		LootRadius:    220,
-		WantCubes:     15,
+		WantCubes:     21,
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
