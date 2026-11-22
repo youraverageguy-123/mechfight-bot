@@ -60,7 +60,7 @@ export const P = {
   // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
   iso: true, // fight movement: try 16 spots 6 m around us, keep line of sight to the target, stay hidden from the rest
   isoOthersR: 170, // other mechs within this range count as watchers
-  isoWatchW: 30, // penalty per watcher that would see us at a spot
+  isoWatchW: 50, // penalty per watcher that would see us at a spot
   isoLosW: 45, // bonus for keeping line of sight to the target (when our weapons are ready)
   gunR: 85, laserR: 120, lightR: 28, // preferred fighting ranges for iso
   loseRule: true, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
