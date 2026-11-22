@@ -280,3 +280,15 @@ Round 13 (settings only) stays available for the last batch.
 | 110 | 6975cbf (own-pa) | 107 + 108 | pending |
 | 111 | 1f12edd (own-all) | 107 + 108 + 109 | pending |
 | 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | pending |
+
+Round 14 revised before submission (Sun ~14:15 UTC): two more additions of our own, from common shooter
+advice (aim where the enemy will appear; hold the angle and let them walk in). PreAim: idle torso points
+where the hunter that just left view will reappear. HoldAngle: with nothing to fetch, stand still while
+a hunter that hurt us or was closing in is out of view. Branch apex-own2. Docker check PASS. Submission
+list for the next hour: 107, 108, 111, and:
+
+| 113 | 4493cd9 (own-pre) | 100 + pre-aim (6 s) | pending |
+| 114 | 6f0fc61 (own-hold) | 113 + hold the angle (4 s) | pending |
+| 115 | 474e73a (own-max) | 111 + 113 + 114 | pending |
+
+Rows 109, 110, 112 are not being submitted.
