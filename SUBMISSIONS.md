@@ -177,12 +177,12 @@ Live board (Sun 11:07 UTC): we are "The anon" #7 at 6.27; #1 6.74, #2 6.63, #3 6
 Round 8 (builders-4): 62 (sq-hunt3) plus one mechanic each (branch az-sets2 adds the sets). Docker check
 PASS (max 3.7 ms). Free-for-all play unchanged.
 
-| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | not submitted |
-| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | not submitted |
-| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | not submitted |
-| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | not submitted |
-| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | not submitted |
-| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | not submitted |
+| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | pending |
+| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | pending |
+| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | pending |
+| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | pending |
+| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | pending |
+| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | pending |
 
 Rows 71-76 withdrawn (Sun ~16:50 IST): the final entry has to be our own code (organizers' rule on excessive
 code reuse, 21 Nov 23:23 UTC), so the remaining slots go to our own bot. Ideas from other bots are fine,
@@ -217,3 +217,18 @@ round 9 variant scores best.
 | 86 | 9f0726e (own-r140p2) | 83 + prey only at 2:1 | pending |
 | 87 | ce65df7 (own-r140farm) | 83 + farm crates and drones until 400 s | pending |
 | 88 | c167cd8 (own-r140ret) | 83 + retreat from 2+ attackers below 60 % HP | pending |
+
+Sun 12:32 UTC: one own-bot submission scored 5.25 (BB-01A707BA); the first of round 9 (77, 6d092e8) or of
+round 10 (83, f5146d9), not confirmed which. The user stopped the own-bot path here and took the
+code-reuse risk on the andrew-zhouu-based build knowingly. Round 8 (71-76, az, all built and checked)
+is back in the queue, rows 77-88 are not being submitted.
+
+Round 11 (builders-4, ready): az, 62 plus one change each (branch az-sets3 adds hunt20-22). Docker check
+PASS. To be trimmed or stacked once round 8 scores are in.
+
+| 89 | 54e08d3 (az-hunt20) | 62 + farm up to 21 cubes (was 15) | ready |
+| 90 | f9fbeca (az-hunt21) | 62 + loot within 300 m (was 220) | ready |
+| 91 | bf2dcde (az-hunt22) | 62 + hold 150-210 m against two or more attackers (was 130-190) | ready |
+| 92 | cc21a57 (az-hunt8) | 62 + seek at half health (was 70 %) | ready |
+| 93 | 46758a0 (az-hunt11) | 62 + fight plan on house accuracy | ready |
+| 94 | 65792a7 (az-hunt12) | 62 + start hunts above 45 % health (was 60 %) | ready |
