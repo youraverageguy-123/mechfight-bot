@@ -277,9 +277,9 @@ Round 13 (settings only) stays available for the last batch.
 | 107 | 43dc2f6 (own-pace) | 100 + kill pacing 20 s / 85 % HP | 6.40 (BB-FF2AA6A8) |
 | 108 | 95a7cfb (own-ammo) | 100 + full-magazine hunts (75 %) | 6.44 (BB-AC171551) |
 | 109 | f91bc53 (own-hurt) | 100 + wounded-first seeking | pending |
-| 110 | 6975cbf (own-pa) | 107 + 108 | 6.33 (last slots) |
+| 110 | 6975cbf (own-pa) | 107 + 108 | 6.33 (BB-BDB6F0B7, last slots) |
 | 111 | 1f12edd (own-all) | 107 + 108 + 109 | 6.51 (BB-87EDF26C) |
-| 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | 6.49 (last slots) |
+| 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | 6.49 (BB-5D9EF139, last slots) |
 
 Round 14 revised before submission (Sun ~14:15 UTC): two more additions of our own, from common shooter
 advice (aim where the enemy will appear; hold the angle and let them walk in). PreAim: idle torso points
