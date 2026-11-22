@@ -177,12 +177,12 @@ Live board (Sun 11:07 UTC): we are "The anon" #7 at 6.27; #1 6.74, #2 6.63, #3 6
 Round 8 (builders-4): 62 (sq-hunt3) plus one mechanic each (branch az-sets2 adds the sets). Docker check
 PASS (max 3.7 ms). Free-for-all play unchanged.
 
-| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | pending |
-| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | pending |
-| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | pending |
-| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | pending |
-| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | pending |
-| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | pending |
+| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | 6.16 (BB-3BB9D832) |
+| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | 6.00 (BB-93E50E9F) |
+| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | not submitted |
+| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | 6.07 (BB-1E30C711) |
+| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | 6.15 (BB-19328AF0) |
+| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | 5.88 (BB-5AAA8C0D) |
 
 Rows 71-76 withdrawn (Sun ~16:50 IST): the final entry has to be our own code (organizers' rule on excessive
 code reuse, 21 Nov 23:23 UTC), so the remaining slots go to our own bot. Ideas from other bots are fine,
@@ -232,3 +232,5 @@ PASS. To be trimmed or stacked once round 8 scores are in.
 | 92 | cc21a57 (az-hunt8) | 62 + seek at half health (was 70 %) | ready |
 | 93 | 46758a0 (az-hunt11) | 62 + fight plan on house accuracy | ready |
 | 94 | 65792a7 (az-hunt12) | 62 + start hunts above 45 % health (was 60 %) | ready |
+
+Round 8 result: 6.16, 6.00, 6.07, 6.15, 5.88; all inside the seek family's spread (mean now 6.12 over 13).
