@@ -267,3 +267,16 @@ Round 13 (builders-4): the 6.55 build (100) plus one setting each. Docker check 
 | 104 | c1fcada (apex-w4) | 100 + farm up to 21 cubes in squad play | pending |
 | 105 | b5d0428 (apex-w5) | 100 + cautious late stance from 300 s (was 265) | pending |
 | 106 | 80dfb57 (apex-w6) | 100 + break off for supply drops within 260 m | pending |
+
+Round 14 (builders-4): our own additions on the 6.55 build (branch apex-own, c2d0223 + README), each
+behind a setting, practice squad only. Kill pacing (PaceSecs/PaceHP): each kill brings another hunter,
+so open no new hunt or seek until health regenerates. Full-magazine hunts (HuntAmmo): reload while
+watching an idle mech, open hunts with a full gun. Wounded-first seeking (SeekHurtW). Docker check PASS.
+Round 13 (settings only) stays available for the last batch.
+
+| 107 | 43dc2f6 (own-pace) | 100 + kill pacing 20 s / 85 % HP | pending |
+| 108 | 95a7cfb (own-ammo) | 100 + full-magazine hunts (75 %) | pending |
+| 109 | f91bc53 (own-hurt) | 100 + wounded-first seeking | pending |
+| 110 | 6975cbf (own-pa) | 107 + 108 | pending |
+| 111 | 1f12edd (own-all) | 107 + 108 + 109 | pending |
+| 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | pending |
