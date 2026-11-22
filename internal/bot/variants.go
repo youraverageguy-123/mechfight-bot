@@ -368,6 +368,12 @@ func Variants() map[string]func(p *Params) {
 		"sq-hunt17": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.PatientSecs = 90 },
 		"sq-hunt18": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.RoofInSquad = true },
 		"sq-hunt19": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.KillFocus = 4 },
+		// hunt20-hunt22 (ohio-ironclad, practice only): builds farming fewer cubes scored lower (WantCubes 6:
+		// 5.89, 3: 5.86, 10: 6.24, 15: 6.27), so farm more; and hold a longer band against two or more
+		// attackers (house guns land 26 % at 80-120 m, 15 % at 120-180 m)
+		"sq-hunt20": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.WantCubes = 21 },
+		"sq-hunt21": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.LootRadius = 300 },
+		"sq-hunt22": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.KiteMin, p.KiteMax = 150, 210 },
 		// Opening sets (OpenSet: played until the lobby is known or the opening is over).
 		// o-quiet: we do not fire first on a mech that has not touched us. Real matches, 4-8 PM Saturday:
 		// our mech was hit by a mech inside 20 s in 52% of matches (TigerTown27: 19%), and in 64% of those
