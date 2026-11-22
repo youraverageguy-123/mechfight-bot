@@ -277,9 +277,9 @@ Round 13 (settings only) stays available for the last batch.
 | 107 | 43dc2f6 (own-pace) | 100 + kill pacing 20 s / 85 % HP | 6.40 (BB-FF2AA6A8) |
 | 108 | 95a7cfb (own-ammo) | 100 + full-magazine hunts (75 %) | 6.44 (BB-AC171551) |
 | 109 | f91bc53 (own-hurt) | 100 + wounded-first seeking | pending |
-| 110 | 6975cbf (own-pa) | 107 + 108 | pending |
+| 110 | 6975cbf (own-pa) | 107 + 108 | 6.33 (last slots) |
 | 111 | 1f12edd (own-all) | 107 + 108 + 109 | 6.51 (BB-87EDF26C) |
-| 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | pending |
+| 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | 6.49 (last slots) |
 
 Round 14 revised before submission (Sun ~14:15 UTC): two more additions of our own, from common shooter
 advice (aim where the enemy will appear; hold the angle and let them walk in). PreAim: idle torso points
@@ -317,3 +317,7 @@ Round 15 result: kill focus 2.5 lost about 0.3 (6.11, 6.14; with our additions 6
 family's 6.45 mean. Pushing the setting past who dey's value was wrong; they had already stepped back from
 2.0 to 1.5. Rows 119-121 (kill focus 2.0 / 3.5, rear-arc 80) should not be submitted. The locked entry
 stays 111 (6.51, our additions, kill focus 1.5).
+
+Last slots (Sun ~15:56-15:59 UTC): 112 (all three additions, stricter pacing) 6.49, 110 (pacing + full
+magazine) 6.33. Neither beat 6.51. Submissions closed at 16:00 UTC with 111 (1f12edd, 6.51) as the
+locked final entry. Next: qualifying (16 free-for-alls among the top 32), then the top 16 play the final.
