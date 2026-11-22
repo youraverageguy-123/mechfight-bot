@@ -1967,7 +1967,7 @@ func squadParams(p Params) Params {
 	p.Ghost = false
 	p.Peek = false
 	p.LaserFirst = true
-	p.LaserRange = 120
+	p.LaserRange = 90
 	p.LootRadius = 150
 	p.CrateUntil = 1e9
 	p.Stick = 120
