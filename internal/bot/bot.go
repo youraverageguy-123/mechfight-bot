@@ -178,7 +178,7 @@ type Params struct {
 func DefaultParams() Params {
 	return Params{
 		Name:          "ohio-ironclad",
-		EngageRatio:   1.25,
+		EngageRatio:   0.9,
 		DisengageRat:  0.75,
 		RetreatHP:     0.45,
 		ReturnHP:      0.85,
@@ -277,8 +277,8 @@ func DefaultParams() Params {
 		LootBoost:         30,
 		ProvokeRule:       true,
 		PlinkMaxDPS:       60,
-		HuntRange:         130,
-		HuntRangeLaser:    130,
+		HuntRange:         180,
+		HuntRangeLaser:    200,
 		KiteMin:        130,
 		KiteMax:        190,
 		PatientCubes:   10,
@@ -299,6 +299,7 @@ func DefaultParams() Params {
 		CoverReload:  true,
 		RetreatPest:  true,
 		PracticeRim:  0.6,
+		Seek: 30, // ohio-ironclad practice setting
 	}
 }
 
