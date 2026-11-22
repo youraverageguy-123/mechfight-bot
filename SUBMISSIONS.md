@@ -177,9 +177,28 @@ Live board (Sun 11:07 UTC): we are "The anon" #7 at 6.27; #1 6.74, #2 6.63, #3 6
 Round 8 (builders-4): 62 (sq-hunt3) plus one mechanic each (branch az-sets2 adds the sets). Docker check
 PASS (max 3.7 ms). Free-for-all play unchanged.
 
-| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | pending |
-| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | pending |
-| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | pending |
-| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | pending |
-| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | pending |
-| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | pending |
+| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | not submitted |
+| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | not submitted |
+| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | not submitted |
+| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | not submitted |
+| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | not submitted |
+| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | not submitted |
+
+Rows 71-76 withdrawn (Sun ~16:50 IST): the final entry has to be our own code (organizers' rule on excessive
+code reuse, 21 Nov 23:23 UTC), so the remaining slots go to our own bot. Ideas from other bots are fine,
+their code is not. The andrew-zhouu-based 6.27 (62) must not be the locked entry.
+
+Round 9 (builders-4): our own bot (main code, never scored on builders-4) with optional prey fights and seek
+(branch own-prey, 6d092e8): with nobody on us and HP > 60 %, fight an idle mech in sight whose time to kill us
+is at least preyRatio times ours; with nothing to do and HP > 70 %, walk to the last place of such a mech
+seen in the last `seek` s. Idea from the andrew-zhouu bot's practice notes, our own code. Docker check PASS
+(p99 2.9 ms). Sim (HOUSE=2 TIERS=1, 150 paired seeds): ratio 1.5 + seek +0.23 +-0.15; ratio 0.9 + seek
+-0.41 +-0.22; ratio 1.2 + seek -0.11 +-0.21; prey only from 150 s -0.01. The sim has missed before
+(kiting: sim +0.77, real -0.13), so the real runs decide.
+
+| 77 | 6d092e8 (own-prey) | our bot, first builders-4 score (new options off) | pending |
+| 78 | 7e2b3d2 (own-p15s) | 77 + prey at 1.5:1 + seek 30 s | pending |
+| 79 | 0fee361 (own-p20s) | 77 + prey at 2:1 + seek 30 s | pending |
+| 80 | 3a4dfb3 (own-p15s60) | 77 + prey at 1.5:1 + seek 60 s | pending |
+| 81 | d1dffbe (own-p15) | 77 + prey at 1.5:1, no seek | pending |
+| 82 | 928df77 (own-p09s) | 77 + prey at 0.9:1 + seek 30 s (the andrew-zhouu setting; sim says worse) | pending |
