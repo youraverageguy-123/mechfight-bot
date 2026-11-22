@@ -56,7 +56,7 @@ export const P = {
   threatNear: 60, // anything closer than this counts as a threat
   avoidR: 60, // keep loot / farm / hold goals this far from idle bots, and hide from idle bots this close
   name: "ohio-ironclad",
-  salt: 0, // mixed into our RNG seed: same strategy, different random choices
+  salt: 1, // mixed into our RNG seed: same strategy, different random choices
   // ---- "isolation" fighting (ideas from the public MIT bot by giddygiddyboy, our own code) ----
   iso: true, // fight movement: try 16 spots 6 m around us, keep line of sight to the target, stay hidden from the rest
   isoOthersR: 170, // other mechs within this range count as watchers
@@ -78,7 +78,7 @@ export const P = {
   lat: 0.075, // aim latency compensation (s): lead from where we and the target will be when the shot leaves (0 = off)
   slewFire: true, // fire the gun when the torso will be on target after this tick's turn, not only when it already is
   lethal: true, // release a partly charged laser when it already kills the target
-  dropHeal: 0, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
+  dropHeal: 0.7, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
   dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
