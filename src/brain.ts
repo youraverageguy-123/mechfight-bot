@@ -43,7 +43,7 @@ export const P = {
   lightningPush: false, // with lightning: boost straight at the target until it is inside arc range
   pushMaxD: 150, // ...when it is closer than this
   kite: false, // boost away from lightning carriers when we lack lightning (sim: no gain)
-  gunBand: [35, 120] as [number, number],
+  gunBand: [90, 180] as [number, number],
   lightningBand: [14, 32] as [number, number],
   laserBand: [60, 200] as [number, number],
   upgrades: ["armor", "plating", "nanites", "gun_rate", "gun_damage", "lightning_efficiency", "laser_damage", "laser_charge",
@@ -62,7 +62,7 @@ export const P = {
   isoOthersR: 170, // other mechs within this range count as watchers
   isoWatchW: 30, // penalty per watcher that would see us at a spot
   isoLosW: 45, // bonus for keeping line of sight to the target (when our weapons are ready)
-  gunR: 85, laserR: 120, lightR: 28, // preferred fighting ranges for iso
+  gunR: 140, laserR: 170, lightR: 28, // preferred fighting ranges for iso
   loseRule: true, // retreat only while losing (2+ mechs near and < 55 % HP, 3+ and < 80 %, or out-HP'd 1v1 under 35 %)
   gTarget: true, // target score: distance + 0.18 HP, minus big bonuses for wounded (< 30 %) and for staying on one target
   gEngage: true, // also fight mechs closing in on us (< 180 m) and wounded mechs (< 40 % HP, < 160 m)
@@ -86,10 +86,10 @@ export const P = {
   preyRatio: 1.5, // (their time to kill us) / (our time to kill them) needed to start one
   preyR: 180, // ...within this range (laser: preyRL)
   preyRL: 200,
-  preyHp: 0.6, // ...above this HP fraction
+  preyHp: 0.75, // ...above this HP fraction
   preyFrom: 0, // ...from this match time
   seek: 30, // with nothing to do, walk to the last place of a beatable mech seen in the last `seek` s (0 = off)
-  seekHp: 0.7, // ...above this HP fraction
+  seekHp: 0.85, // ...above this HP fraction
   seekR: 320, // ...no farther than this
   dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
 }
