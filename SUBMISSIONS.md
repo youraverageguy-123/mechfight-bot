@@ -173,3 +173,13 @@ scored after that would be played in free-for-all mode, so the last submissions 
 Round 7 result: seek-family scores 6.27, 6.24, 6.20, 6.27, 6.11, 6.27, 5.89, 5.86 (mean 6.14, sd 0.17); no
 tweak stands out from the noise. 62 (BB-B15B4441) stays the entry: equal scores rank the earlier one first.
 Live board (Sun 11:07 UTC): we are "The anon" #7 at 6.27; #1 6.74, #2 6.63, #3 6.49; top-32 line 5.96.
+
+Round 8 (builders-4): 62 (sq-hunt3) plus one mechanic each (branch az-sets2 adds the sets). Docker check
+PASS (max 3.7 ms). Free-for-all play unchanged.
+
+| 71 | dac5e9e (az-hunt14) | 62 + run for supply drops within 260 m when hurt | pending |
+| 72 | 63a6631 (az-hunt15) | 62 + run for supply drops within 420 m at any health | pending |
+| 73 | 893aec7 (az-hunt16) | 62 + farm instead of killing hunters for the first 45 s | pending |
+| 74 | b6f8acc (az-hunt17) | 62 + farm instead of killing hunters for the first 90 s | pending |
+| 75 | b142b12 (az-hunt18) | 62 + hold roofs in squad play | pending |
+| 76 | e813c44 (az-hunt19) | 62 + focus fire on the most damaged target | pending |
