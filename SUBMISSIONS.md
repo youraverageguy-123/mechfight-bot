@@ -234,3 +234,21 @@ PASS. To be trimmed or stacked once round 8 scores are in.
 | 94 | 65792a7 (az-hunt12) | 62 + start hunts above 45 % health (was 60 %) | ready |
 
 Round 8 result: 6.16, 6.00, 6.07, 6.15, 5.88; all inside the seek family's spread (mean now 6.12 over 13).
+
+Research (Sun ~13:00 UTC): the #1 board entry (Ahmad Suliman, 6.74) is public and MIT: Apex-Go v3 by
+ahmad-ovh, https://github.com/ahmad-ovh/Buildathon commit 56e0f76 (scored 07:11 UTC, pushed 06:47 UTC).
+It is itself built on the andrew-zhouu bot plus ideas from other public bots. Its later commits
+(06:48-06:57 UTC: "simplify", "reduce steering search", "widen fire cone") look like weakening edits
+after the scored build, so we use 56e0f76. Team who dey (#5, 6.49) runs 56e0f76 with RearAvoidW 50,
+CubeSmart, KillFocus 1.5. Apex v3 has Seek off and EngageRatio 1.25 / HuntRange 130 in squad play,
+where our andrew-zhouu runs gained about 0.2 from seek. Round 11 (az) is superseded.
+
+Round 12 (builders-4): Apex-Go v3 (branch apex-v3: their files, LICENSE-apex, credit README, our display
+name). Docker check PASS (max 2.8 ms).
+
+| 95 | 3627404 (apex-v3) | Apex-Go v3 as published at 56e0f76 | pending |
+| 96 | b3a81d8 (apex-wd) | 95 + who dey's settings (rear-arc 50, cube pricing, kill focus 1.5) | pending |
+| 97 | f911ad6 (apex-seek) | 95 + seek 30 s in squad play | pending |
+| 98 | da318b0 (apex-hunt) | 95 + hunt at 0.9 odds within 180 m (laser 200 m) in squad play | pending |
+| 99 | eaff419 (apex-sh) | 97 + 98 | pending |
+| 100 | 420a906 (apex-wdsh) | 96 + 97 + 98 | pending |
