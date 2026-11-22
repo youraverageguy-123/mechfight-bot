@@ -157,15 +157,19 @@ andrew-zhouu code's own sweep sets (its notes: hN was the best of its first swee
 hunt10, hunt13 are ours (branch az-sets adds them). Docker check PASS (max 3.2 ms). Free-for-all play
 unchanged.
 
-| 65 | bde996f (az-hN) | fight on 0.6 odds (was 0.9), seek, stop farming at 6 cubes | pending |
-| 66 | 25dfe7c (az-hN2) | 65 with farming stopped at 3 cubes | pending |
-| 67 | d91145f (az-hN4) | 62 + stop farming at 6 cubes | pending |
-| 68 | 16c78a2 (az-hunt9) | 62 + remember seen mechs 60 s when seeking (was 30) | pending |
-| 69 | c82fbcd (az-hunt10) | 62 + seek up to 500 m away (was 320) | pending |
-| 70 | 8f76cad (az-hunt13) | 68 + 69 + seek at half health (was 70 %) | pending |
+| 65 | bde996f (az-hN) | fight on 0.6 odds (was 0.9), seek, stop farming at 6 cubes | 6.20 (BB-9670EE7D) |
+| 66 | 25dfe7c (az-hN2) | 65 with farming stopped at 3 cubes | 5.86 (BB-DD3E9747) |
+| 67 | d91145f (az-hN4) | 62 + stop farming at 6 cubes | 5.89 (BB-6A468782) |
+| 68 | 16c78a2 (az-hunt9) | 62 + remember seen mechs 60 s when seeking (was 30) | 6.27 (BB-50859AEF) |
+| 69 | c82fbcd (az-hunt10) | 62 + seek up to 500 m away (was 320) | 6.11 (BB-F5346C33) |
+| 70 | 8f76cad (az-hunt13) | 68 + 69 + seek at half health (was 70 %) | 6.27 (BB-577E7529) |
 
 Ready for a later batch (pushed): az-hunt8 cc21a57 (62 + seek at half health), az-hunt11 46758a0
 (62 + house-accuracy fight plan), az-hunt12 65792a7 (62 + hunt above 45 % health).
 
 Cutoff note: these builds play free-for-all from 16:00 UTC (21:30 IST). A practice run still being
 scored after that would be played in free-for-all mode, so the last submissions should go in by 21:00 IST.
+
+Round 7 result: seek-family scores 6.27, 6.24, 6.20, 6.27, 6.11, 6.27, 5.89, 5.86 (mean 6.14, sd 0.17); no
+tweak stands out from the noise. 62 (BB-B15B4441) stays the entry: equal scores rank the earlier one first.
+Live board (Sun 11:07 UTC): we are "The anon" #7 at 6.27; #1 6.74, #2 6.63, #3 6.49; top-32 line 5.96.
