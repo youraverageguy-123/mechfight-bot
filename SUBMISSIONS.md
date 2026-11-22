@@ -202,3 +202,18 @@ seen in the last `seek` s. Idea from the andrew-zhouu bot's practice notes, our 
 | 80 | 3a4dfb3 (own-p15s60) | 77 + prey at 1.5:1 + seek 60 s | pending |
 | 81 | d1dffbe (own-p15) | 77 + prey at 1.5:1, no seek | pending |
 | 82 | 928df77 (own-p09s) | 77 + prey at 0.9:1 + seek 30 s (the andrew-zhouu setting; sim says worse) | pending |
+
+Round 10 (builders-4, queued for the hour after round 9): our own bot, 78 (prey 1.5 + seek 30) with the gun
+held at long range against the house squad. Data point from another team's public notes (house guns land
+85 % inside 40 m, 52 % at 40-80 m, 26 % at 80-120 m, 15 % at 120-180 m); our code. Sim house aim was
+recalibrated to that table (HSCALE 0.4: 88/54/22/7 %). Sim, 200 paired seeds: gun range 140 m vs 85 m
++0.23 +-0.14 (calibrated), +0.28 +-0.21 (old aim), +0.17 +-0.14 (slow ramp); 120 m ~0; house-accuracy
+fight estimates -0.20 (left off). Docker check PASS. Params only, so they can be re-based on whichever
+round 9 variant scores best.
+
+| 83 | f5146d9 (own-r140) | 78 + gun at 140 m (band 90-180), laser at 170 m | pending |
+| 84 | 4dae321 (own-r140ph) | 83 + prey above 75 % HP, seek above 85 % | pending |
+| 85 | ffc0f5e (own-r160) | 78 + gun at 160 m (band 110-200), laser at 190 m | pending |
+| 86 | 9f0726e (own-r140p2) | 83 + prey only at 2:1 | pending |
+| 87 | ce65df7 (own-r140farm) | 83 + farm crates and drones until 400 s | pending |
+| 88 | c167cd8 (own-r140ret) | 83 + retreat from 2+ attackers below 60 % HP | pending |
