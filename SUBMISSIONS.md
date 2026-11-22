@@ -135,3 +135,17 @@ Round 5 (builders-4): real parameter variants of the giddy bot.
 Note: in squad play the giddy bot's losing-fight rule replaces the HP retreat thresholds, so RetreatHP
 variants would change nothing there (not queued).
 
+Rows 53-58 are on hold: the next batches use the andrew-zhouu bot instead (approved Sun ~14:40 IST).
+
+Round 6 (builders-4): andrew-zhouu's MIT Go bot v0.167 (https://github.com/andrew-zhouu/builders-mech-royale-2026,
+commit 6f9e678), credited in the branch README, our display name only. Docker check PASS (max 3.7 ms).
+The variants change only the practice set in its build string (dice kept at 2); free-for-all play is
+the same in all of them, and the bot plays free-for-all from the first tick after the cutoff.
+
+| 59 | 8d23b8a (az-base) | their build as published: sq-hunt + quiet opening | pending |
+| 60 | 89e3e80 (az-hunt5) | 59, fight plan on the house bots' measured accuracy | pending |
+| 61 | 45e73f9 (az-hunt6) | 59, stop farming at 10 cubes so hunting starts sooner | pending |
+| 62 | 7b8c27a (az-hunt3) | 59, go looking for the next hunter instead of hiding | pending |
+| 63 | c043bdd (az-hunt7) | 61 + 62 | pending |
+| 64 | 20bf993 (az-hunt2) | 59, hunt at longer range on thinner odds | pending |
+
