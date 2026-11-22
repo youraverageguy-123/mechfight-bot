@@ -74,9 +74,13 @@ Iso movement is the first real gain: the five iso variants scored 5.00-5.50 (mea
 without it 4.79, every earlier version 4.5-4.95. Same-strategy salt draws 5.10 / 5.50 (sd ~0.25).
 Retreat rule, chasing and idle-bot avoidance: no visible difference.
 
-| 29 | dec59e6 (exp-y-cover) | 23 + retreat cover hidden from all known mechs, hold when hidden, re-pick 0.5 s | pending |
-| 30 | 2b4cd99 (exp-z-rings2) | 23 + iso candidates at 6 m and 12 m | pending |
-| 31 | bec2d97 (exp-aa-watch50) | 23 + iso watcher penalty 50 (was 30) | pending |
-| 32 | 622b22b (exp-ab-hide-all) | 29 + 30 + 31 | pending |
-| 33 | f0c8b43 (exp-ac-iso-s2) | 23, RNG salt 2 | pending |
-| 34 | ce10b3e (exp-ad-iso-s3) | 23, RNG salt 3 | pending |
+| 29 | dec59e6 (exp-y-cover) | 23 + retreat cover hidden from all known mechs, hold when hidden, re-pick 0.5 s | 5.13 (BB-A6D12DAC) |
+| 30 | 2b4cd99 (exp-z-rings2) | 23 + iso candidates at 6 m and 12 m | 5.46 (BB-A07C640E) |
+| 31 | bec2d97 (exp-aa-watch50) | 23 + iso watcher penalty 50 (was 30) | 4.96 (BB-76177633) |
+| 32 | 622b22b (exp-ab-hide-all) | 29 + 30 + 31 | 4.98 (BB-A22DE1FA) |
+| 33 | f0c8b43 (exp-ac-iso-s2) | 23, RNG salt 2 | 5.00 (BB-A9DEF2C2) |
+| 34 | ce10b3e (exp-ad-iso-s3) | 23, RNG salt 3 | 5.17 (BB-F1BFF625) |
+
+Iso main over four salt draws: 5.10 / 5.50 / 5.00 / 5.17 (mean 5.19, sd 0.22). Of the hiding changes
+only the 12 m ring (5.46) is above that mean, and by less than the noise. Cover-from-all 5.13 and
+watcher 50 4.96 show nothing; all three together 4.98.
