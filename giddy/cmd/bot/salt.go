@@ -5,7 +5,7 @@ package main
 // choices in only that slot's matches. 0 = the seed as given.
 var baseSalt uint64 = 0
 
-var slotSalt = map[int]uint64{}
+var slotSalt = map[int]uint64{8: 2}
 
 func saltSeed(seed uint64, slot int) uint64 {
 	s := baseSalt
