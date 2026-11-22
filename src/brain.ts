@@ -74,11 +74,11 @@ export const P = {
   coverAll: false, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
   coverReplan: 1.5, // seconds between cover re-picks while retreating
   coverStay: false, // already hidden from them all: stay put
-  isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
+  isoRings: 2, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
   lat: 0.075, // aim latency compensation (s): lead from where we and the target will be when the shot leaves (0 = off)
   slewFire: true, // fire the gun when the torso will be on target after this tick's turn, not only when it already is
   lethal: true, // release a partly charged laser when it already kills the target
-  dropHeal: 0, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
+  dropHeal: 0.7, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
   dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
