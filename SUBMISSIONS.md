@@ -84,3 +84,19 @@ Retreat rule, chasing and idle-bot avoidance: no visible difference.
 Iso main over four salt draws: 5.10 / 5.50 / 5.00 / 5.17 (mean 5.19, sd 0.22). Of the hiding changes
 only the 12 m ring (5.46) is above that mean, and by less than the noise. Cover-from-all 5.13 and
 watcher 50 4.96 show nothing; all three together 4.98.
+
+Board check (Sun 07:15 IST): #1 6.44, #9 giddygiddyboy 6.31, #32 ~6.13. The qualifying line has risen
+past 6.1. Same-code salt draws differ by sd ~0.2, so a board best is roughly mean + 2 sd of many draws.
+
+Round 3: the 6.19 bot's shooting micro, rebuilt in our code: lead from where both mechs will be when
+the shot leaves (75 ms), fire the gun when the torso will be on target after this tick's turn, release a
+partly charged laser once it kills. Optional: use a landed supply drop as a heal station below 70 % HP
+(within 150 m, alone in the ring; full HP, full energy, 3 cubes). Docker check PASS (max 6 ms on reruns),
+fuzz 0 errors / 12000.
+
+| 35 | 27bf3b7 (main) | 23 + latency-compensated aim + slew firing + lethal laser | pending |
+| 36 | 848b2e2 (exp-af-fire-r2) | 35 + iso rings 6 m and 12 m | pending |
+| 37 | 5fb3d63 (exp-ah-fire-drop) | 35 + drop heal below 70 % | pending |
+| 38 | 51691c2 (exp-ag-fire-r2-drop) | 35 + rings 2 + drop heal | pending |
+| 39 | e589abd (exp-ai-fire-r2-s1) | 36, RNG salt 1 | pending |
+| 40 | 5f57edc (exp-aj-fire-drop-s1) | 37, RNG salt 1 | pending |
