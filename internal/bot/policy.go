@@ -292,6 +292,7 @@ func (b *Bot) think(act *proto.Action) {
 				wantFight = true
 			}
 		case st.hunt && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > 0.6 &&
+			b.paceOK(st, hpFrac) && b.huntAmmoOK(st) &&
 			// (real matches: the one who fires first comes out ahead only with a laser against none:
 			// 11.1 final points against the victim's 9.1; level otherwise, and 2 points behind when it
 			// is the victim that has the laser)
@@ -1062,6 +1063,15 @@ func (b *Bot) think(act *proto.Action) {
 		// watch it without provoking
 		at := b.targetOf(tgt.tr)
 		b.engage(act, at, tgt.tr.LOS, false, tgt.tr.HP, false)
+		// ohio-ironclad: an idle mech in view is the next fight; go into it with a full magazine
+		if b.P.HuntAmmo > 0 && st.name == "squad" && !act.Reload && b.t-tgt.tr.HurtMeT > 3 {
+			if gi := b.has("gun"); gi >= 0 && !act.Fire[gi] {
+				sl := &b.slots[gi]
+				if sl.reload <= 0 && sl.ammo < stat(sl.stats, "mag", 12)*b.P.HuntAmmo {
+					act.Reload = true
+				}
+			}
+		}
 	default:
 		b.idleAim(act, heading, haveHeading)
 		// top up the magazine while nothing is happening
@@ -1453,6 +1463,9 @@ func (b *Bot) seekTarget(st stance, hpFrac float64) (x, y float64, id int, ok bo
 	if b.P.Seek <= 0 || st.name != "squad" || !st.hunt || hpFrac < seekHP {
 		return 0, 0, -1, false
 	}
+	if !b.paceOK(st, hpFrac) {
+		return 0, 0, -1, false
+	}
 	if b.seekBan == nil {
 		b.seekBan = map[int]float64{}
 	}
@@ -1476,6 +1489,9 @@ func (b *Bot) seekTarget(st stance, hpFrac float64) (x, y float64, id int, ok bo
 		if adv, _, _ := b.fightPlan(tr, d); adv < st.engageRatio {
 			continue
 		}
+		if b.P.SeekHurtW > 0 && tr.MaxHP > 0 {
+			d -= b.P.SeekHurtW * 100 * clamp(1-tr.HP/tr.MaxHP, 0, 1)
+		}
 		if d < bd || (d == bd && best != nil && tr.ID < best.ID) {
 			best, bd = tr, d
 		}
@@ -1485,4 +1501,28 @@ func (b *Bot) seekTarget(st stance, hpFrac float64) (x, y float64, id int, ok bo
 	}
 	x, y, ok = b.roamGoal()
 	return x, y, -1, ok
+}
+
+// ohio-ironclad: paceOK says whether we may open a new fight of our own (hunt or seek) now. Against the
+// practice squad every kill brings another hunter, and health comes back by itself once nothing hits us
+// for a few seconds, so right after a kill we only go looking for the next one at near-full health.
+func (b *Bot) paceOK(st stance, hpFrac float64) bool {
+	if b.P.PaceSecs <= 0 || st.name != "squad" || b.kills == 0 {
+		return true
+	}
+	return b.t-b.lastKillT > b.P.PaceSecs || hpFrac >= b.P.PaceHP
+}
+
+// ohio-ironclad: huntAmmoOK says whether the gun has enough rounds to open a hunt (a 2.4 s reload in
+// the first exchange hands the other mech free shots).
+func (b *Bot) huntAmmoOK(st stance) bool {
+	if b.P.HuntAmmo <= 0 || st.name != "squad" {
+		return true
+	}
+	gi := b.has("gun")
+	if gi < 0 || b.has("laser") >= 0 || b.has("lightning") >= 0 {
+		return true // the second weapon opens the fight
+	}
+	sl := &b.slots[gi]
+	return sl.reload <= 0 && sl.ammo >= stat(sl.stats, "mag", 12)*b.P.HuntAmmo
 }

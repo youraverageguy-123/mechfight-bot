@@ -173,6 +173,12 @@ type Params struct {
 	EdgeBand         float64 // in FFA stance, penalize hiding closer than EdgeBand*NextRadius to center (0 = off)
 	PracticeRim      float64 // practice rim-riding: prefer outer 85-90% of next circle while NextRadius >= 180 (0 = off)
 	RetreatPest      bool    // shoot plinking NPC drone while retreating if no enemy mech is engaged
+
+	// ohio-ironclad additions (our own code, practice squad only, 0 = off)
+	PaceSecs  float64 // after each of our kills the squad sends another hunter: for this long, start no hunt or seek ...
+	PaceHP    float64 // ... unless our health is back above this fraction (regeneration does the rest)
+	HuntAmmo  float64 // start a hunt only with at least this share of the gun magazine; top up while watching an idle mech
+	SeekHurtW float64 // seek: prefer a wounded mech, counting each missing 1% of its health as this many metres closer
 }
 
 func DefaultParams() Params {
@@ -481,6 +487,7 @@ type Bot struct {
 	ffaSeenT    float64 // last time we saw evidence other mechs fight each other
 	ffaBeams    int     // count of distinct observations with distant enemy-on-enemy beams
 	kills       int
+	lastKillT   float64 // ohio-ironclad: match time of our latest kill
 	killsSeen   int
 	deadSeen    int
 	unexplained int  // deaths we did not cause
@@ -1018,6 +1025,7 @@ func (b *Bot) observe(o *proto.Obs) {
 			}
 		case "kill":
 			b.kills++
+			b.lastKillT = b.t
 			delete(b.tracks, e.Target)
 			if b.targetID == e.Target {
 				b.targetID = -1
