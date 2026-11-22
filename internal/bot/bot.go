@@ -296,7 +296,7 @@ func DefaultParams() Params {
 		AntiLightningPad: 12,
 		SmartFireV2:      true,
 		LaserEarlyRel:    true,
-		RearBonus:        0.25,
+		RearBonus:        0.35,
 		CookoffBonus:     0.30,
 		CautiousT:        265,
 		BeamFFA:          true,
@@ -308,7 +308,7 @@ func DefaultParams() Params {
 		RetreatPest:  true,
 		PracticeRim:  0.6,
 		CubeSmart: true, // ohio-ironclad practice setting
-		KillFocus: 1.5, // ohio-ironclad practice setting
+		KillFocus: 2.0, // ohio-ironclad practice setting
 		Seek: 30, // ohio-ironclad practice setting
 	}
 }
