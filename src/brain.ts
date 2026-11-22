@@ -82,13 +82,13 @@ export const P = {
   // ---- hunting idle house bots (idea from the public andrew-zhouu bot's practice notes; our own code) ----
   // Every house bot that dies before us is a place. Idle ones wait to be found, so with health to spare and
   // nobody on us, pick a fight with one we expect to win, and go looking for one when there is nothing to do.
-  prey: false, // start fights with idle mechs when our time-to-kill beats theirs by preyRatio
+  prey: true, // start fights with idle mechs when our time-to-kill beats theirs by preyRatio
   preyRatio: 0.9, // (their time to kill us) / (our time to kill them) needed to start one
   preyR: 180, // ...within this range (laser: preyRL)
   preyRL: 200,
   preyHp: 0.6, // ...above this HP fraction
   preyFrom: 0, // ...from this match time
-  seek: 0, // with nothing to do, walk to the last place of a beatable mech seen in the last `seek` s (0 = off)
+  seek: 30, // with nothing to do, walk to the last place of a beatable mech seen in the last `seek` s (0 = off)
   seekHp: 0.7, // ...above this HP fraction
   seekR: 320, // ...no farther than this
   dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
