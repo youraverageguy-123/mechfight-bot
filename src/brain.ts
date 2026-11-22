@@ -75,6 +75,11 @@ export const P = {
   coverReplan: 1.5, // seconds between cover re-picks while retreating
   coverStay: false, // already hidden from them all: stay put
   isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
+  lat: 0.075, // aim latency compensation (s): lead from where we and the target will be when the shot leaves (0 = off)
+  slewFire: true, // fire the gun when the torso will be on target after this tick's turn, not only when it already is
+  lethal: true, // release a partly charged laser when it already kills the target
+  dropHeal: 0, // HP fraction below which a supply drop is used as a heal station, even mid-fight (0 = off)
+  dropHealR: 150, // ...up to this far (only once it is landing within 4 s)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
   "lightning_range", "servos", "gun_mag", "gun_velocity", "gyros", "lightning_chain", "reactor", "capacitor", "mortar_reload",
@@ -150,6 +155,8 @@ export class Brain {
   isoWant = 1
   isoFinish = false
   isoObs: Observation | null = null
+  /** Supply-drop ring we are capturing: [x, y, usable radius], or null. */
+  ring: [number, number, number] | null = null
   /** Milliseconds left for optional searches this decision (the hard limit is 50 ms). */
   private budget(): number {
     return P.tickBudgetMs - (now() - this.tickStart)
@@ -503,11 +510,16 @@ export class Brain {
     const fire = [false, false]
     let aimSet = false
     let mortarMode = false
+    let gunSol: AimSol | null = null
+    let gunTol: [number, number] = [0, 0]
     if (target) {
       const tz = target.pos[2] + target.h * 0.5
       const floor = this.map.surfAt(target.pos[0], target.pos[1]) + target.h * 0.3
       const gs = gun ? gun.w.stats.speed : 252
-      const sol = leadStraight(x, y, muzzleZ, target.pos[0], target.pos[1], tz, target.vel[0], target.vel[1], target.vel[2], gs, 3, floor, this.cfg.mech.gravity)
+      const L = P.lat
+      const ox = x + me.vel[0] * L, oy = y + me.vel[1] * L
+      const sol = leadStraight(ox, oy, muzzleZ, target.pos[0] + target.vel[0] * L, target.pos[1] + target.vel[1] * L, tz,
+        target.vel[0], target.vel[1], target.vel[2], gs, 3, floor, this.cfg.mech.gravity)
       aimYaw = sol.yaw
       aimPitch = sol.pitch
       aimSet = true
@@ -517,6 +529,8 @@ export class Brain {
       const tolY = Math.atan2(target.r * 0.8, dd) + 0.004
       const tolP = Math.atan2(target.h * 0.35, dd) + 0.004
       const aimed = eYaw < tolY && ePitch < tolP
+      gunSol = sol
+      gunTol = [tolY, tolP]
       if (gun && aimed && target.d <= gun.w.stats.range && (gun.w.ammo ?? 1) > 0 && !(gun.w.reload ?? 0)) fire[gun.slot] = true
       if (lightning) {
         const L = lightning.w.stats
@@ -529,8 +543,11 @@ export class Brain {
       if (laser && target.kind !== "crate") {
         const Ls = laser.w.stats
         const charge = laser.w.charge ?? 0
-        const yawTo = Math.atan2(target.pos[1] - y, target.pos[0] - x)
-        const pitchTo = Math.atan2(tz - muzzleZ, target.d)
+        const LL = P.lat > 0 ? P.lat + 0.05 : 0
+        const lx0 = x + me.vel[0] * P.lat, ly0 = y + me.vel[1] * P.lat
+        const lpx = target.pos[0] + target.vel[0] * LL, lpy = target.pos[1] + target.vel[1] * LL
+        const yawTo = Math.atan2(lpy - ly0, lpx - lx0)
+        const pitchTo = Math.atan2(tz - muzzleZ, Math.max(1, Math.hypot(lpx - lx0, lpy - ly0)))
         const eY = Math.abs(angDiff(me.aim[0], yawTo))
         const eP = Math.abs(me.aim[1] - pitchTo)
         const ok = eY < Math.atan2(target.r * 0.7, target.d) && eP < Math.atan2(target.h * 0.3, target.d)
@@ -538,6 +555,14 @@ export class Brain {
           // keep holding until full and on target, then release
           const full = charge >= Ls.charge - 0.02
           fire[laser.slot] = !(full && ok)
+          if (P.lethal && !full && target.kind === "mech" && charge >= (Ls.min_charge ?? 0.15) && ok) {
+            const mf = Ls.min_frac ?? 0.35
+            let dmg = Ls.damage * (mf + ((1 - mf) * charge) / Ls.charge) *
+              (1 + (this.cfg.cubes.damage_per_cube ?? 0.04) * Math.min(me.cubes, this.cfg.cubes.stat_cap ?? 10))
+            const te = mechs.find((q) => q.id === target!.id)
+            if (te && te.weapons.includes("mortar")) dmg *= 1 + (Ls.cookoff ?? 0.6)
+            if (dmg * 0.7 >= target.hp) fire[laser.slot] = false
+          }
           // fast movers: aim straight at them for the hitscan, not led
           if (target.kind === "mech" || target.kind === "npc") {
             aimYaw = yawTo
@@ -579,6 +604,15 @@ export class Brain {
       }
     }
     void mortarMode
+    if (P.slewFire && target && gun && gunSol && !mortarMode && !fire[gun.slot] && target.d <= gun.w.stats.range &&
+      (gun.w.ammo ?? 1) > 0 && !(gun.w.reload ?? 0)) {
+      // the torso turns toward the commanded aim before the shot leaves: fire if it will be on target then
+      const tr = (st.turn_rate ?? this.cfg.mech.turn_rate ?? 4) * 0.05
+      const pr = (st.pitch_rate ?? this.cfg.mech.pitch_rate ?? 3) * 0.05
+      const y1 = me.aim[0] + clamp(angDiff(aimYaw, me.aim[0]), -tr, tr)
+      const p1 = me.aim[1] + clamp(aimPitch - me.aim[1], -pr, pr)
+      if (Math.abs(angDiff(y1, gunSol.yaw)) < gunTol[0] && Math.abs(p1 - gunSol.pitch) < gunTol[1]) fire[gun.slot] = true
+    }
 
     if (!aimSet) {
       if (focus) {
@@ -721,6 +755,36 @@ export class Brain {
       }
     }
 
+    // supply drop as a heal station: 4 s alone in its ring = full HP, full energy and 3 cubes
+    this.ring = null
+    if (!goal && P.dropHeal > 0 && !roofBusy && !this.climbing) {
+      let best: { pos: number[]; radius: number } | null = null
+      let bd = Infinity
+      for (const dr of obs.drops ?? []) {
+        if (dr.holder != null && dr.holder !== this.myId) continue
+        const d = Math.hypot(dr.pos[0] - x, dr.pos[1] - y)
+        if (d > P.dropHealR || dr.lands_in > Math.min(4, d / walk + 2)) continue
+        if (!(hpFrac < P.dropHeal || !fighting)) continue
+        if (mechs.some((e) => t - e.seen < 1 && Math.hypot(e.pos[0] - dr.pos[0], e.pos[1] - dr.pos[1]) < dr.radius + 2)) continue
+        if (!this.safe(obs, dr.pos[0], dr.pos[1], d / walk + 6, 4)) continue
+        if (d < bd) {
+          bd = d
+          best = dr
+        }
+      }
+      if (best) {
+        if (bd < best.radius - 2.2) {
+          this.ring = [best.pos[0], best.pos[1], best.radius - 2.2]
+          this.retreating = false
+          if (!(fighting && focus && focus.los)) goal = [x, y]
+        } else {
+          goal = [best.pos[0], best.pos[1]]
+          goalBoost = me.energy > 20
+        }
+        this.mode = "drop-heal"
+      }
+    }
+
     // retreat to cover
     let stayHidden = false
     if (!goal && this.retreating && fighting && !roofBusy) {
@@ -763,14 +827,14 @@ export class Brain {
     if (!goal && fighting && focus && !this.campRoof && !this.climbing) {
       const band = this.band(me)
       if (focus.los) fightMove = true
-      else if (P.hunt && !this.retreating && hpFrac > P.huntMinHp && t - focus.seen < 5 && focus.d < P.huntRange) {
+      else if (P.hunt && !this.ring && !this.retreating && hpFrac > P.huntMinHp && t - focus.seen < 5 && focus.d < P.huntRange) {
         goal = [focus.pos[0], focus.pos[1]]
         this.mode = "hunt"
       } else fightMove = true
       void band
     }
     // mid-fight: walk over cubes that are close (kills drop the victim's cubes + 2)
-    if (fightMove && P.fightCube > 0 && !this.retreating) {
+    if (fightMove && P.fightCube > 0 && !this.retreating && !this.ring) {
       let r = P.fightCube * (hpFrac <= 0.5 ? 0.57 : 1)
       let bc: Known | null = null
       for (const c of this.cubes.values()) {
@@ -948,7 +1012,8 @@ export class Brain {
     const dodge = this.dodge(obs, me)
     if (dodge) {
       const m2 = norm2(move[0] * 0.4 + dodge[0], move[1] * 0.4 + dodge[1])
-      if (this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) {
+      const ringOk = !this.ring || Math.hypot(x + m2[0] * 2 - this.ring[0], y + m2[1] * 2 - this.ring[1]) < this.ring[2]
+      if (ringOk && this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) {
         move = m2
         if (me.energy > 15) boost = true
       }
@@ -1175,7 +1240,7 @@ export class Brain {
       let cx = x, cy = y, dx = 0, dy = 0, r = 0
       if (k >= 0) {
         const a = ((k % 16) * Math.PI) / 8
-        r = 6 * (1 + Math.floor(k / 16))
+        r = (this.ring ? 3 : 6) * (1 + Math.floor(k / 16))
         dx = Math.cos(a)
         dy = Math.sin(a)
         cx = x + dx * r
@@ -1188,6 +1253,7 @@ export class Brain {
       const cz = k < 0 ? me.pos[2] : this.map.surfAt(cx, cy)
       const d = Math.hypot(e.pos[0] - cx, e.pos[1] - cy)
       let s = -1.1 * Math.abs(d - rp) - r * 0.4
+      if (this.ring && Math.hypot(cx - this.ring[0], cy - this.ring[1]) > this.ring[2]) s -= 500
       const los = this.map.clear(cx, cy, cz + mh, e.pos[0], e.pos[1], tz, 1, 1.5)
       if (los) s += P.isoLosW * this.isoWant
       for (const o of others) {

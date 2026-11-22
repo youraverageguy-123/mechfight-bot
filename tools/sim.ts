@@ -176,7 +176,8 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   let still = 0
   const dur = cfg.match.duration_s
   let activated = 1
-  const world: any = { npcs: [], cubes: [], offer: null }
+  const world: any = { npcs: [], cubes: [], offer: null, drops: [] }
+  let dropsTaken = 0, dropsHouse = 0
   const shells: Shell[] = []
   SQ.lkX = NaN; SQ.lkY = NaN; SQ.lkT = -1e9
   SND.gun = SND.laser = SND.light = SND.boost = SND.step = -9
@@ -528,6 +529,50 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
         if (rnd() < 0.5) damage(me, cfg.npc.damage, null, "npc", q.pos[0], q.pos[1], t)
       }
     }
+    // supply drops (DROPS=1): called at 70/140/210 s, land 25 s later inside the next circle; 4 s alone in the ring
+    if (process.env.DROPS === "1") {
+      for (const ct of [70, 140, 210])
+        if (Math.abs(t - ct) < DT / 2) {
+          const zi = zoneInfo(t)
+          for (let tries = 0; tries < 200; tries++) {
+            const p = randNode()
+            if (Math.hypot(p[0] - zi.next_center[0], p[1] - zi.next_center[1]) < zi.next_radius * 0.8) {
+              world.drops.push({ id: 20000 + ct, pos: p, landT: t + 25, progress: 0, holder: null })
+              break
+            }
+          }
+        }
+      for (let di = world.drops.length - 1; di >= 0; di--) {
+        const dr = world.drops[di]
+        if (t < dr.landT) continue
+        const inside = mechs.filter((q) => q.alive && present(q) && Math.hypot(q.pos[0] - dr.pos[0], q.pos[1] - dr.pos[1]) < 8)
+        if (inside.length !== 1) {
+          if (inside.length === 0) { dr.progress = 0; dr.holder = null }
+          continue
+        }
+        const h = inside[0]
+        if (dr.holder !== h.id) { dr.holder = h.id; dr.progress = 0 }
+        dr.progress += DT
+        if (dr.progress >= 4) {
+          world.drops.splice(di, 1)
+          h.hp = h.maxHp
+          h.energy = 100
+          if (h.id === 0) {
+            dropsTaken++
+            for (let k = 0; k < 3; k++) {
+              me.cubes++
+              gotCubes++
+              if (me.cubes <= cfg.cubes.stat_cap) {
+                const add = me.maxHp * cfg.cubes.hp_per_cube
+                me.maxHp += add
+                me.hp += add
+              }
+              if (thresholds.includes(me.cubes)) offers++
+            }
+          } else dropsHouse++
+        }
+      }
+    }
     for (let ci = cubes.length - 1; ci >= 0; ci--) {
       const c = cubes[ci]
       if (Math.hypot(c.pos[0] - me.pos[0], c.pos[1] - me.pos[1]) < cfg.cubes.pickup_radius && Math.abs(c.pos[2] - me.pos[2]) < 4) {
@@ -577,7 +622,7 @@ function runMatch(seed: number, skill: number, give: string, nHunters: number, a
   const before = mechs.filter((m) => m.id > 0 && m.diedAt < me.diedAt).length
   const place = 16 - before
   tms.sort((a, b) => a - b)
-  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), cubes: gotCubes, drones: dronesKilled, killT, death: deathInfo, upg: applied, byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
+  return { seed, surv, kills, place, pts: 16 - place, dmgIn: Math.round(dmgIn), dmgOut: Math.round(dmgOut), stuck: stuckTicks, p99: +(tms[Math.floor(tms.length * 0.99)] ?? 0).toFixed(2), maxMs: +maxMs.toFixed(1), cubes: gotCubes, drones: dronesKilled, killT, death: deathInfo, upg: applied, byW, laserShots, st: brain.stats, missD: brain.missD, picked: pickedAt, crates: cratesBroken, drops: [dropsTaken, dropsHouse], acc: [+(hits[0] / Math.max(1, fired[0])).toFixed(2), +(hits[1] / Math.max(1, fired[1])).toFixed(2)], fired, modes }
 }
 
 function visList(m: any, list: any[], hz: number): any[] {
@@ -851,7 +896,7 @@ function buildObs(m: Mech, mechs: Mech[], shots: Shot[], zone: any, t: number, t
       stats: { ...cfg.mech },
     },
     mechs: vis.concat(visList(m, world.npcs, 3.5).map((q: any) => ({ id: q.id, kind: "npc", pos: q.pos.slice(), vel: [0, 0, 0], aim: [0, 0], hp: q.hp, max_hp: 350 }))),
-    projectiles, crates: cr, cubes: visList(m, world.cubes, 0.5).map((c: any) => ({ id: c.id, pos: c.pos.slice() })), pickups: pk, sounds, beams: [], events: m.events.slice(), drops: [], zone, offer: world.offer,
+    projectiles, crates: cr, cubes: visList(m, world.cubes, 0.5).map((c: any) => ({ id: c.id, pos: c.pos.slice() })), pickups: pk, sounds, beams: [], events: m.events.slice(), drops: (world.drops ?? []).map((d: any) => ({ id: d.id, pos: d.pos, radius: 8, lands_in: Math.max(0, d.landT - t), capture_s: 4, progress: d.progress, holder: d.holder })), zone, offer: world.offer,
   } as any
 }
 
@@ -862,7 +907,8 @@ const nH = Number(process.argv[5] ?? 15)
 const armed = (process.argv[6] ?? "1") === "1"
 if (process.argv[7]) Object.assign(P, JSON.parse(process.argv[7]))
 const res = []
-for (let s = 1; s <= seeds; s++) {
+const S0 = Number(process.env.SEED0 ?? 0)
+for (let s = S0 + 1; s <= S0 + seeds; s++) {
   const r = runMatch(s, skill, give, nH, armed)
   res.push(r)
   console.log(JSON.stringify(r))
