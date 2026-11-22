@@ -321,3 +321,9 @@ stays 111 (6.51, our additions, kill focus 1.5).
 Last slots (Sun ~15:56-15:59 UTC): 112 (all three additions, stricter pacing) 6.49, 110 (pacing + full
 magazine) 6.33. Neither beat 6.51. Submissions closed at 16:00 UTC with 111 (1f12edd, 6.51) as the
 locked final entry. Next: qualifying (16 free-for-alls among the top 32), then the top 16 play the final.
+
+Final results (published Sun 22 Nov, ~18:40 UTC): The anon finished 11th of 410 teams, a finalist, with
+a series mean of 6.91 in the 16-mech free-for-all final (locked entry 111, 6.51 practice). Top 3: 9.45
+(winner), Seven Duce 9.02, tigerbyte 8.98. Several finalists with lower practice scores (Seven Duce,
+Soloing, azing) placed high in the final: practice against the house squad did not predict free-for-all
+strength.
