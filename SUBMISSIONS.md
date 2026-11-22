@@ -255,3 +255,15 @@ name). Docker check PASS (max 2.8 ms).
 
 Round 12 result: with who dey's settings 6.50 and 6.55 (now the entry, BB-DAD4F6EC), without 6.00-6.39
 (mean 6.19). Apex v3 as published scored 6.00 here, so its 6.74 was a high draw or another commit.
+Board (13:56 UTC): #1 6.74, #2 IT_Professionals 6.71, ... #6 The anon 6.55; top-32 line 6.08.
+who dey's repo went private at ~13:55 UTC; their history (local clone) tried NanoBoost, UpV2, DropRun 60,
+LaserMechOnly, CautiousT 230/300, CookoffBonus 0.45, PracticeRim 0.45/0.75, RearBonus 0.35, each once.
+
+Round 13 (builders-4): the 6.55 build (100) plus one setting each. Docker check PASS on w2 and w4.
+
+| 101 | 88fd68c (apex-w1) | 100 + seek memory 60 s | pending |
+| 102 | fed947a (apex-w2) | 100 + exact sustained-DPS upgrade order (UpV2) | pending |
+| 103 | eb70337 (apex-w3) | 100 + repair nanites ranked higher (NanoBoost 2) | pending |
+| 104 | c1fcada (apex-w4) | 100 + farm up to 21 cubes in squad play | pending |
+| 105 | b5d0428 (apex-w5) | 100 + cautious late stance from 300 s (was 265) | pending |
+| 106 | 80dfb57 (apex-w6) | 100 + break off for supply drops within 260 m | pending |
