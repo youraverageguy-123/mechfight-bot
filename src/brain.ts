@@ -74,7 +74,7 @@ export const P = {
   coverAll: false, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
   coverReplan: 1.5, // seconds between cover re-picks while retreating
   coverStay: false, // already hidden from them all: stay put
-  isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
+  isoRings: 2, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
   "lightning_range", "servos", "gun_mag", "gun_velocity", "gyros", "lightning_chain", "reactor", "capacitor", "mortar_reload",
