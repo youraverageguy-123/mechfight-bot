@@ -63,9 +63,20 @@ losing; target the wounded and stick to them; finish at 20 m; grab cubes mid-fig
 Reimplemented those ideas in our own code (iso / loseRule / gTarget / gEngage / finishR /
 fightCube / laserSeek / noMortar / gUp switches).
 
-| 23 | ee50061 (main) | iso fighting + lose-rule retreat + finisher targeting + fight cubes + laser seek, no kiting | pending |
-| 24 | 38f971e (exp-t-iso-nohunt) | 23 without chasing hidden enemies | pending |
-| 25 | 0405f87 (exp-u-iso-s1) | 23, RNG salt 1 | pending |
-| 26 | 39c6d7b (exp-v-noiso) | 23 without iso movement (old strafe) | pending |
-| 27 | 54ff748 (exp-w-iso-oldretreat) | 23 with the old HP-threshold retreat | pending |
-| 28 | 41594f4 (exp-x-iso-noavoid) | 23 without avoiding idle bots | pending |
+| 23 | ee50061 (main) | iso fighting + lose-rule retreat + finisher targeting + fight cubes + laser seek, no kiting | 5.10 (BB-B8AD2E5E) |
+| 24 | 38f971e (exp-t-iso-nohunt) | 23 without chasing hidden enemies | 5.00 (BB-133A8606) |
+| 25 | 0405f87 (exp-u-iso-s1) | 23, RNG salt 1 | **5.50** (BB-FE172E24) |
+| 26 | 39c6d7b (exp-v-noiso) | 23 without iso movement (old strafe) | 4.79 (BB-667B4A8E) |
+| 27 | 54ff748 (exp-w-iso-oldretreat) | 23 with the old HP-threshold retreat | 5.35 (BB-CE7A1B96) |
+| 28 | 41594f4 (exp-x-iso-noavoid) | 23 without avoiding idle bots | 5.08 (BB-8CB1FDBC) |
+
+Iso movement is the first real gain: the five iso variants scored 5.00-5.50 (mean 5.21), the one
+without it 4.79, every earlier version 4.5-4.95. Same-strategy salt draws 5.10 / 5.50 (sd ~0.25).
+Retreat rule, chasing and idle-bot avoidance: no visible difference.
+
+| 29 | dec59e6 (exp-y-cover) | 23 + retreat cover hidden from all known mechs, hold when hidden, re-pick 0.5 s | pending |
+| 30 | 2b4cd99 (exp-z-rings2) | 23 + iso candidates at 6 m and 12 m | pending |
+| 31 | bec2d97 (exp-aa-watch50) | 23 + iso watcher penalty 50 (was 30) | pending |
+| 32 | 622b22b (exp-ab-hide-all) | 29 + 30 + 31 | pending |
+| 33 | f0c8b43 (exp-ac-iso-s2) | 23, RNG salt 2 | pending |
+| 34 | ce10b3e (exp-ad-iso-s3) | 23, RNG salt 3 | pending |
