@@ -151,3 +151,21 @@ the same in all of them, and the bot plays free-for-all from the first tick afte
 
 Seek (62, 63) scored 6.27 and 6.24; the four without it averaged 5.97. 62 is our best (board #5) and is
 the entered final pick. Next batches build on seek. Page shows 48 matches per practice run.
+
+Round 7 (builders-4): seek-based practice sets on top of 62 (sq-hunt3, 6.27). hN, hN2, hN4 are the
+andrew-zhouu code's own sweep sets (its notes: hN was the best of its first sweep, +0.12); hunt9,
+hunt10, hunt13 are ours (branch az-sets adds them). Docker check PASS (max 3.2 ms). Free-for-all play
+unchanged.
+
+| 65 | bde996f (az-hN) | fight on 0.6 odds (was 0.9), seek, stop farming at 6 cubes | pending |
+| 66 | 25dfe7c (az-hN2) | 65 with farming stopped at 3 cubes | pending |
+| 67 | d91145f (az-hN4) | 62 + stop farming at 6 cubes | pending |
+| 68 | 16c78a2 (az-hunt9) | 62 + remember seen mechs 60 s when seeking (was 30) | pending |
+| 69 | c82fbcd (az-hunt10) | 62 + seek up to 500 m away (was 320) | pending |
+| 70 | 8f76cad (az-hunt13) | 68 + 69 + seek at half health (was 70 %) | pending |
+
+Ready for a later batch (pushed): az-hunt8 cc21a57 (62 + seek at half health), az-hunt11 46758a0
+(62 + house-accuracy fight plan), az-hunt12 65792a7 (62 + hunt above 45 % health).
+
+Cutoff note: these builds play free-for-all from 16:00 UTC (21:30 IST). A practice run still being
+scored after that would be played in free-for-all mode, so the last submissions should go in by 21:00 IST.
