@@ -71,9 +71,9 @@ export const P = {
   laserSeek: 240, // walk this far for a laser even with another second weapon (0 = off)
   noMortar: true, // never pick up a mortar
   gUp: true, // upgrade order: plating, armor, laser damage/charge, nanites, gun...
-  coverAll: false, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
-  coverReplan: 1.5, // seconds between cover re-picks while retreating
-  coverStay: false, // already hidden from them all: stay put
+  coverAll: true, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
+  coverReplan: 0.5, // seconds between cover re-picks while retreating
+  coverStay: true, // already hidden from them all: stay put
   isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
