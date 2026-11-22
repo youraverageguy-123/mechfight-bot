@@ -246,9 +246,12 @@ where our andrew-zhouu runs gained about 0.2 from seek. Round 11 (az) is superse
 Round 12 (builders-4): Apex-Go v3 (branch apex-v3: their files, LICENSE-apex, credit README, our display
 name). Docker check PASS (max 2.8 ms).
 
-| 95 | 3627404 (apex-v3) | Apex-Go v3 as published at 56e0f76 | pending |
-| 96 | b3a81d8 (apex-wd) | 95 + who dey's settings (rear-arc 50, cube pricing, kill focus 1.5) | pending |
-| 97 | f911ad6 (apex-seek) | 95 + seek 30 s in squad play | pending |
-| 98 | da318b0 (apex-hunt) | 95 + hunt at 0.9 odds within 180 m (laser 200 m) in squad play | pending |
-| 99 | eaff419 (apex-sh) | 97 + 98 | pending |
-| 100 | 420a906 (apex-wdsh) | 96 + 97 + 98 | pending |
+| 95 | 3627404 (apex-v3) | Apex-Go v3 as published at 56e0f76 | 6.00 (BB-17FA83D6) |
+| 96 | b3a81d8 (apex-wd) | 95 + who dey's settings (rear-arc 50, cube pricing, kill focus 1.5) | 6.50 (BB-258CC180) |
+| 97 | f911ad6 (apex-seek) | 95 + seek 30 s in squad play | 6.20 (BB-EA2C9934) |
+| 98 | da318b0 (apex-hunt) | 95 + hunt at 0.9 odds within 180 m (laser 200 m) in squad play | 6.17 (BB-D5E7B255) |
+| 99 | eaff419 (apex-sh) | 97 + 98 | 6.39 (BB-596750ED) |
+| 100 | 420a906 (apex-wdsh) | 96 + 97 + 98 | 6.55 (BB-DAD4F6EC) |
+
+Round 12 result: with who dey's settings 6.50 and 6.55 (now the entry, BB-DAD4F6EC), without 6.00-6.39
+(mean 6.19). Apex v3 as published scored 6.00 here, so its 6.74 was a high draw or another commit.
