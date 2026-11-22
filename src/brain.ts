@@ -71,6 +71,10 @@ export const P = {
   laserSeek: 240, // walk this far for a laser even with another second weapon (0 = off)
   noMortar: true, // never pick up a mortar
   gUp: true, // upgrade order: plating, armor, laser damage/charge, nanites, gun...
+  coverAll: false, // retreat cover hides from every mech seen in the last 2.5 s within 230 m (4 nearest), not only attackers
+  coverReplan: 1.5, // seconds between cover re-picks while retreating
+  coverStay: false, // already hidden from them all: stay put
+  isoRings: 1, // iso candidate rings (1 = 6 m, 2 = 6 m and 12 m)
 }
 const G_UPGRADES = ["plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
   "lightning_range", "servos", "gun_mag", "gun_velocity", "gyros", "lightning_chain", "reactor", "capacitor", "mortar_reload",
@@ -718,10 +722,21 @@ export class Brain {
     }
 
     // retreat to cover
+    let stayHidden = false
     if (!goal && this.retreating && fighting && !roofBusy) {
-      if (t - this.coverT > 1.5 || Number.isNaN(this.coverX)) this.pickCover(obs, engaged)
+      if (t - this.coverT > P.coverReplan || Number.isNaN(this.coverX)) {
+        let threats: Enemy[] = engaged
+        if (P.coverAll) {
+          const all = [...this.enemies.values()].filter((q) => t - q.seen < 2.5 && Math.hypot(q.pos[0] - x, q.pos[1] - y) < 230)
+          all.sort((a, b) => Math.hypot(a.pos[0] - x, a.pos[1] - y) - Math.hypot(b.pos[0] - x, b.pos[1] - y))
+          threats = all.slice(0, 4)
+          for (const q of engaged) if (!threats.some((w) => w.id === q.id)) threats.push(q)
+        }
+        this.pickCover(obs, threats)
+      }
       if (!Number.isNaN(this.coverX)) {
         goal = [this.coverX, this.coverY]
+        if (P.coverStay && Math.hypot(this.coverX - x, this.coverY - y) < 1.5) stayHidden = true
         goalBoost = me.energy > 25
         this.mode = "retreat"
       }
@@ -928,6 +943,7 @@ export class Brain {
       if (this.walkOk(x, y, x + m2[0] * 3, y + m2[1] * 3)) move = m2
     }
 
+    if (stayHidden) move = [0, 0]
     // dodge incoming fire
     const dodge = this.dodge(obs, me)
     if (dodge) {
@@ -1155,17 +1171,17 @@ export class Brain {
     const [lx, ly, lr] = this.zoneAt(obs, t)
     const soon = clamp(1 - (zn.shrink_start - t) / 25, 0.1, 1)
     let best = -Infinity, mx = 0, my = 0, blockedSide = false
-    for (let k = -1; k < 16; k++) {
+    for (let k = -1; k < 16 * P.isoRings; k++) {
       let cx = x, cy = y, dx = 0, dy = 0, r = 0
       if (k >= 0) {
-        const a = (k * Math.PI) / 8
-        r = 6
+        const a = ((k % 16) * Math.PI) / 8
+        r = 6 * (1 + Math.floor(k / 16))
         dx = Math.cos(a)
         dy = Math.sin(a)
         cx = x + dx * r
         cy = y + dy * r
         if (!this.walkOk(x, y, cx, cy)) {
-          if (dx * sx + dy * sy > 0.9) blockedSide = true
+          if (k < 16 && dx * sx + dy * sy > 0.9) blockedSide = true
           continue
         }
       }
@@ -1268,6 +1284,15 @@ export class Brain {
     this.coverT = obs.t
     let best = -1
     let bs = Infinity
+    if (P.coverStay && threats.length > 0) {
+      const [, , z0] = obs.self.pos
+      const hid = threats.every((e) => !m.clear(e.pos[0], e.pos[1], e.pos[2] + 8, x, y, z0 + 8.5, 1, 0.5) && !m.clear(e.pos[0], e.pos[1], e.pos[2] + 8, x, y, z0 + 4.5, 1, 0.5))
+      if (hid && this.safe(obs, x, y, 15, 6)) {
+        this.coverX = x
+        this.coverY = y
+        return
+      }
+    }
     const radii = [8, 14, 22, 32, 45, 60]
     for (const r of radii) {
       if (this.budget() < 4) break
