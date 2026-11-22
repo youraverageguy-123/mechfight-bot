@@ -308,7 +308,7 @@ func DefaultParams() Params {
 		RetreatPest:  true,
 		PracticeRim:  0.6,
 		CubeSmart: true, // ohio-ironclad practice setting
-		KillFocus: 1.5, // ohio-ironclad practice setting
+		KillFocus: 3.5, // ohio-ironclad practice setting
 		Seek: 30, // ohio-ironclad practice setting
 	}
 }
