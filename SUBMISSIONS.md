@@ -274,11 +274,11 @@ so open no new hunt or seek until health regenerates. Full-magazine hunts (HuntA
 watching an idle mech, open hunts with a full gun. Wounded-first seeking (SeekHurtW). Docker check PASS.
 Round 13 (settings only) stays available for the last batch.
 
-| 107 | 43dc2f6 (own-pace) | 100 + kill pacing 20 s / 85 % HP | pending |
-| 108 | 95a7cfb (own-ammo) | 100 + full-magazine hunts (75 %) | pending |
+| 107 | 43dc2f6 (own-pace) | 100 + kill pacing 20 s / 85 % HP | 6.40 (BB-FF2AA6A8) |
+| 108 | 95a7cfb (own-ammo) | 100 + full-magazine hunts (75 %) | 6.44 (BB-AC171551) |
 | 109 | f91bc53 (own-hurt) | 100 + wounded-first seeking | pending |
 | 110 | 6975cbf (own-pa) | 107 + 108 | pending |
-| 111 | 1f12edd (own-all) | 107 + 108 + 109 | pending |
+| 111 | 1f12edd (own-all) | 107 + 108 + 109 | 6.51 (BB-87EDF26C) |
 | 112 | ad1b4ca (own-all2) | 111 with pacing 30 s / 95 % HP | pending |
 
 Round 14 revised before submission (Sun ~14:15 UTC): two more additions of our own, from common shooter
@@ -287,8 +287,13 @@ where the hunter that just left view will reappear. HoldAngle: with nothing to f
 a hunter that hurt us or was closing in is out of view. Branch apex-own2. Docker check PASS. Submission
 list for the next hour: 107, 108, 111, and:
 
-| 113 | 4493cd9 (own-pre) | 100 + pre-aim (6 s) | pending |
-| 114 | 6f0fc61 (own-hold) | 113 + hold the angle (4 s) | pending |
-| 115 | 474e73a (own-max) | 111 + 113 + 114 | pending |
+| 113 | 4493cd9 (own-pre) | 100 + pre-aim (6 s) | 6.40 (BB-831C0759) |
+| 114 | 6f0fc61 (own-hold) | 113 + hold the angle (4 s) | 6.34 (BB-35C168E0) |
+| 115 | 474e73a (own-max) | 111 + 113 + 114 | 6.48 (BB-D026B1B0) |
 
 Rows 109, 110, 112 are not being submitted.
+
+Round 14 result: 6.40, 6.44, 6.51, 6.40, 6.34, 6.48. With round 12, the eight builds carrying who dey's
+settings scored 6.34-6.55 (mean 6.45, sd 0.07): per-run noise on this bot is about 0.07, so our additions
+are within noise of the 6.55 build (all three 6.51, all five 6.48; hold-the-angle lowest at 6.34).
+The big step so far came from who dey's settings (KillFocus 1.5, CubeSmart, RearAvoidW 50): +0.3 to +0.5.
