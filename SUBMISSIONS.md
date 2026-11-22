@@ -142,10 +142,12 @@ commit 6f9e678), credited in the branch README, our display name only. Docker ch
 The variants change only the practice set in its build string (dice kept at 2); free-for-all play is
 the same in all of them, and the bot plays free-for-all from the first tick after the cutoff.
 
-| 59 | 8d23b8a (az-base) | their build as published: sq-hunt + quiet opening | pending |
-| 60 | 89e3e80 (az-hunt5) | 59, fight plan on the house bots' measured accuracy | pending |
-| 61 | 45e73f9 (az-hunt6) | 59, stop farming at 10 cubes so hunting starts sooner | pending |
-| 62 | 7b8c27a (az-hunt3) | 59, go looking for the next hunter instead of hiding | pending |
-| 63 | c043bdd (az-hunt7) | 61 + 62 | pending |
-| 64 | 20bf993 (az-hunt2) | 59, hunt at longer range on thinner odds | pending |
+| 59 | 8d23b8a (az-base) | their build as published: sq-hunt + quiet opening | 6.07 (BB-C934BF69) |
+| 60 | 89e3e80 (az-hunt5) | 59, fight plan on the house bots' measured accuracy | 6.00 (BB-D67E009E) |
+| 61 | 45e73f9 (az-hunt6) | 59, stop farming at 10 cubes so hunting starts sooner | 5.89 (BB-58978E77) |
+| 62 | 7b8c27a (az-hunt3) | 59, go looking for the next hunter instead of hiding | 6.27 (BB-B15B4441) |
+| 63 | c043bdd (az-hunt7) | 61 + 62 | 6.24 (BB-6B3EE86B) |
+| 64 | 20bf993 (az-hunt2) | 59, hunt at longer range on thinner odds | 5.91 (BB-37CD3B29) |
 
+Seek (62, 63) scored 6.27 and 6.24; the four without it averaged 5.97. 62 is our best (board #5) and is
+the entered final pick. Next batches build on seek. Page shows 48 matches per practice run.
