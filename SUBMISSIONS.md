@@ -297,3 +297,14 @@ Round 14 result: 6.40, 6.44, 6.51, 6.40, 6.34, 6.48. With round 12, the eight bu
 settings scored 6.34-6.55 (mean 6.45, sd 0.07): per-run noise on this bot is about 0.07, so our additions
 are within noise of the 6.55 build (all three 6.51, all five 6.48; hold-the-angle lowest at 6.34).
 The big step so far came from who dey's settings (KillFocus 1.5, CubeSmart, RearAvoidW 50): +0.3 to +0.5.
+
+Round 15 (final batch; slots free one at a time from 15:42 UTC, cutoff 16:00 UTC): push the setting
+that gave the big step (kill focus: weight on a target's missing health) and rear-arc avoidance, on the
+6.55 build (our additions off unless listed). Docker check PASS on two. Listed in submit order.
+
+| 116 | 015e103 (fin-kf25) | 100 with kill focus 2.5 (was 1.5) | pending |
+| 117 | 9dc13bc (fin-all-kf25) | 111 (6.51) with kill focus 2.5 | pending |
+| 118 | 9e9e3c0 (fin-kf25-ra80) | 116 + rear-arc avoidance 80 (was 50) | pending |
+| 119 | dbeaa17 (fin-kf2-rb) | 100 with kill focus 2.0 + rear-shot target bonus 0.35 (was 0.25) | pending |
+| 120 | 0f6f03a (fin-ra80) | 100 with rear-arc avoidance 80 | pending |
+| 121 | 21d30a6 (fin-kf35) | 100 with kill focus 3.5 | pending |
