@@ -125,4 +125,13 @@ Round 5 (builders-4): real parameter variants of the giddy bot.
 | 50 | 9407d03 (g4-eg70) | 47 + late hiding from the 70 m circle (was 140 m) | pending |
 | 51 | 2de4210 (g4-eg240) | 47 + late hiding from the 240 m circle | pending |
 | 52 | 7af8246 (g4-drops-eg70) | 48 + 50 | pending |
+| 53 | 09fdc0e (g4-lr170) | 47 + hold 170 m with a laser against the squad (was 120 m; house guns land 15-26 % past 80 m) | pending |
+| 54 | 8558718 (g4-gr110) | 47 + gun fights at 110 m (was 85 m) | pending |
+| 55 | c437874 (g4-nolose) | 47 + HP retreat rule instead of the losing-fight rule in squad play | pending |
+| 56 | 09e3f09 (g4-drops-lr170) | 48 + 53 | pending |
+| 57 | eb92e44 (g4-lr170-gr110) | 53 + 54 | pending |
+| 58 | faf8cf1 (g4-lr90) | 47 + hold 90 m with a laser | pending |
+
+Note: in squad play the giddy bot's losing-fight rule replaces the HP retreat thresholds, so RetreatHP
+variants would change nothing there (not queued).
 
