@@ -345,6 +345,18 @@ func Variants() map[string]func(p *Params) {
 			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200
 			p.Seek, p.WantCubes = 30, 10
 		},
+		// hunt8-hunt13 (ohio-ironclad, practice only): sq-hunt3 scored 6.27 and sq-hunt7 6.24 on builders-4,
+		// the four sets without Seek 5.89-6.07. Each takes hunt3 and changes one seek or hunt setting;
+		// hunt13 changes all three seek settings together.
+		"sq-hunt8":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.SeekHP = 0.5 },
+		"sq-hunt9":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 60 },
+		"sq-hunt10": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.SeekRange = 500 },
+		"sq-hunt11": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.HouseModel = true },
+		"sq-hunt12": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30; p.HuntHP = 0.45 },
+		"sq-hunt13": func(p *Params) {
+			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200
+			p.Seek, p.SeekHP, p.SeekRange = 60, 0.5, 500
+		},
 		// Opening sets (OpenSet: played until the lobby is known or the opening is over).
 		// o-quiet: we do not fire first on a mech that has not touched us. Real matches, 4-8 PM Saturday:
 		// our mech was hit by a mech inside 20 s in 52% of matches (TigerTown27: 19%), and in 64% of those
